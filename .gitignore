@@ -1,0 +1,15 @@
+/nbproject/private/
+/.idea
+/.settings
+/dist
+/.DS_Store
+.project
+.pydevproject
+/nbproject
+/build
+*.pyc
+*.ini
+*.txt
+/Stores.Hospital.html
+/Stephano_be.egg-info
+/data

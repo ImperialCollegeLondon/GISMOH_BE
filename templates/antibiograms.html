@@ -1,0 +1,35 @@
+{% extends base.html %}
+{% block startup_script %}
+		<!--  <script src="/static/require.js" type="text/javascript"  data-main="/static/test"></script> -->
+{% end %}
+
+{% block title %}
+	<h1>Antibiogram Test</h1>
+{% end %}
+
+{% block content %}
+	<table class="ab_table">
+		<tr>
+			<th>
+				Isolate
+			</th>
+			{% for a in antibiotics %}
+				<th>{{a}}</th>
+			{% end %}
+		</tr>
+
+		{% for ab in antibiograms %}
+			<tr>
+				<td>{{ab['Result']['isolate_id']}}</td>
+				{% if len(ab['Result']) > 0 %}
+					{% for a in range(len(ab['Result']['result'])) %}
+						<td class="{{ab['Result']['result'][a]['SIR']}}">{{ab['Result']['result'][a]['SIR']}}</td>
+					{% end %}
+					<td class="{{ab['similarity']}}">{{ab['similarity']}}</td>
+					
+				{% end %}
+			</tr>
+		{% end %}
+		
+	</table>
+{% end %}
