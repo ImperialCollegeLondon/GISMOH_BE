@@ -3,7 +3,7 @@ class Antibiogram(object):
     
     def __init__(self, store):
         self.store = store
-        pass
+        
     
     ## Compare 2 antibiograms and return a similarity score
     # @param ab1 Store.Result: 

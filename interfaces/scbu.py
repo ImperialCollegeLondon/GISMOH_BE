@@ -19,15 +19,23 @@ class SCBU_Importer(object):
         headers = _rr.next();
         self.adm = Store.Admission()
         
+        curlocs = []
+        
         for row in _rr:
             #print row
             patient = self.read_patient(row, headers)
             location = self.read_location(row, headers)
             
             if self.adm.patient_id is not None and (self.adm.patient_id != patient.uniq_id or location.arrived != prev.left):
+       
+                for l in curlocs:
+                    l.admission_id = self.adm.get_key()    
+                    self.store.save(l)
+                curlocs = []
+                
                 self.store.save(self.adm)
+                
                 self.adm = Store.Admission()
-                self.uniq_id = str(uuid.uuid4())
                 
             if self.adm.patient_id is None:
                 self.adm.patient_id = patient.uniq_id
@@ -38,9 +46,7 @@ class SCBU_Importer(object):
             if self.adm.end_date is None or self.adm.end_date < location.left:
                 self.adm.end_date = location.left
             
-            location.admission_id = self.adm.get_key()    
-            
-            self.store.save(location)
+            curlocs.append(location)
             prev = location
             
     def read_isolates(self):
@@ -104,6 +110,7 @@ class SCBU_Importer(object):
             'Isolate_Number': 'lab_number',
             'DateSent' : 'date_taken'
         })
+    
         
         _iso.meta_tags = {
             'st' : _dict['ST'],

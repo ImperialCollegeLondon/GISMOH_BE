@@ -65,7 +65,10 @@ class main_test(unittest.TestCase):
         pat.from_dict(_td, { 'nhsno' : 'nhs_number', 'gender' : 'sex'})
         assert pat.nhs_number == '123456789X'
         assert pat.sex == 'M'
-        
-        
+    
+    @raises(NotImplementedError)
+    def test_bad_get_key(self):
+        go = Store.GISMOH_Object()
+        go.get_key()
         
         

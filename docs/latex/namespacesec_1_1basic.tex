@@ -25,15 +25,15 @@ Example usage (also see helloworld_basic.py in the examples):
 
     # define the validation callback.
     def validate(uname, passwd):
-creds = {'auth_username': 'jonesy', 'auth_password': 'foobar'}
-if uname == creds['auth_username'] and passwd == creds['auth_password']:
-    return True
-else:
-    return False
+        creds = {'auth_username': 'jonesy', 'auth_password': 'foobar'}
+        if uname == creds['auth_username'] and passwd == creds['auth_password']:
+return True
+        else:
+return False
 
     # now define the RequestHandler, using the decorator.
     @require_basic_auth('AuthRealm', validate)
     class MainHandler(tornado.web.RequestHandler):
-def get(self):
-    self.write("Hello, world - Tornado %s" % tornado.version)\end{DoxyVerb}
+        def get(self):
+self.write("Hello, world - Tornado %s" % tornado.version)\end{DoxyVerb}
  

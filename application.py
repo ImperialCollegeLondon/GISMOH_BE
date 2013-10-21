@@ -4,6 +4,7 @@ import tornado.web
 import json
 from os import path
 import uuid
+import datetime
 
 from sec.basic import require_basic_auth
 from sec import ldapauth
@@ -13,34 +14,25 @@ from modules.Antibiogram import Antibiogram
 
 print 'started'
 
+def get_arg_or_default(torn, argname, default):
+    try:
+        arg = torn.get_argument(argname)
+    except (tornado.web.MissingArgumentError):
+        arg = default
+    return arg
+
 ##Index page handler
 @require_basic_auth('GISMOH', ldapauth.auth_user_ldap)
 class MainHandler(tornado.web.RequestHandler):
     def get(self):
-        
-#         rows = cb.query('dev_wards', 'WardList')
-#         
-#         rowout = ''
-#         for row in rows:
-#             rowout = '%s, %s' % (rowout, row.key)
-        
         self.render('main.html')#,test_val=rowout)
         
-#     def post(self):
-#         self.set_header('Content-type', 'application/json')
-#         cb.set(str(uuid.uuid4()), self.request.arguments)
-#         self.write(json.dumps(self.request.arguments))
-
 @require_basic_auth('GISMOH', ldapauth.auth_user_ldap)
 class Antibiogram_Test(tornado.web.RequestHandler):
     def get(self):
         
-        try:
-            iso_id = float(self.get_argument('isolate_id'))
-        except (tornado.web.MissingArgumentError):
-            iso_id = 1.0
+        iso_id = float(get_arg_or_default(self,'isolate_id', 1.0))
 
-        
         _store = Store.Store('GISMOH', 'gismoh2')
   
         _abm = Antibiogram(_store)
@@ -57,9 +49,58 @@ class Antibiogram_Test(tornado.web.RequestHandler):
             ab_list = ab_list + [x['Antibiotic'] for x in ab['result']]
             
             aaaaa = _abm.get_nearest(ab, None, 11.5/12.0, gap_penalty = 0.25)
+        
+        self.add_header('Content-type', 'application/json')
+        self.write(json.dumps(aaaaa))
+
+@require_basic_auth('GISMOH', ldapauth.auth_user_ldap) 
+class OverlapHandler(tornado.web.RequestHandler):
+    def get(self):
+        from modules.Location import LocationInterface
+        import datetime
+        
+        patient_id = float(get_arg_or_default(self,'patient_id', 1.0))
+        date_from = datetime.datetime.strptime(get_arg_or_default(self,'from', (datetime.datetime.now() - datetime.timedelta(days=7)).strftime('%Y-%m-%d %H:%M:%S')), '%Y-%m-%d %H:%M:%S')
+        date_to = datetime.datetime.strptime(get_arg_or_default(self,'to', datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')), '%Y-%m-%d %H:%M:%S')
+        
+        _store = Store.Store('GISMOH', 'gismoh2')
+        
+        patient = Store.Patient.get_by_key(_store, patient_id)
+        _loc_if = LocationInterface(_store)
     
-        self.render('antibiograms.html',antibiotics = ab_list, antibiograms=aaaaa)
+        olaps = _loc_if.get_overlaps_with_patient(patient)
     
+        for k in olaps:
+            olaps[k] = [o.get_dict() for o in olaps[k]]
+    
+        self.add_header('Content-type', 'application/json')
+        self.write(json.dumps(olaps))
+
+@require_basic_auth('GISMOH', ldapauth.auth_user_ldap) 
+class RiskAndPositiveHandler(tornado.web.RequestHandler):
+    def get(self):
+
+        _store = Store.Store('GISMOH', 'gismoh2')
+        
+        at_date = datetime.datetime.strptime(get_arg_or_default(self,'at_date', datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')), '%Y-%m-%d %H:%M:%S')
+        
+        patients = {}
+        
+        for loc in Store.Location.get_locations_at(_store, at_date):
+            pat = { 'patient_id' : loc.patient_id, 'location' : loc.get_dict() } #, 'admission' : Store.Admission.get_by_key(_store, loc.admission_id).get_dict() }
+            patients[str(loc.patient_id)] = pat
+            
+        for res_res in _store.get_next_from('Results'):
+            res = Store.Result.get_by_key(_store, res_res.docid)
+            iso = Store.Isolate.get_by_key(_store, res.isolate_id)
+
+            if patients.has_key(iso.patient_id):
+                patients[str(iso.patient_id)]['ab'] = res.get_dict()
+         
+        self.add_header('Content-type', 'application/json')
+        self.write(json.dumps(patients))   
+            
+        
 
 settings = dict(
    template_path = path.join(path.dirname(__file__), "templates"),
@@ -68,7 +109,9 @@ settings = dict(
 )
 
 application = tornado.web.Application([
-    (r'/antibiogram_test', Antibiogram_Test),
+    (r'/antibiogram', Antibiogram_Test),
+    (r'/overlaps', OverlapHandler),
+    (r'/risk_patients', RiskAndPositiveHandler),
     (r"/", MainHandler)
 ], **settings)
 

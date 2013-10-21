@@ -35,8 +35,10 @@ def auth_user_ldap(uname, pwd):
     if LDAP_VERSION_3:
         ld.set_option(ldap.VERSION3, 1)
    # ld.start_tls_s()
-   
-    ld.simple_bind_s('DIDE\\' + uname, pwd)
+    try:
+        ld.simple_bind_s('DIDE\\' + uname, pwd)
+    except:
+        return False
    
     udn = ld.search_s(LDAP_SEARCH_BASE, ldap.SCOPE_ONELEVEL, '(%s=%s)' % (LDAP_UNAME_ATTR,uname), [LDAP_BIND_ATTR])
     

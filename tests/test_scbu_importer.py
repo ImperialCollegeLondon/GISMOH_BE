@@ -8,25 +8,25 @@ class SCBU_Tests(TestCase):
     def test_create_interface(self):
         con = Store.Store('GISMOH', 'gismoh2')
         _if = ds.SCBU_Importer('/Users/Chris/Documents/Addenbrookes Project/SCBU.xlsx', con)
-         
+            
     def test_do_import(self):
         con = Store.Store('GISMOH', 'gismoh2')
         _if = ds.SCBU_Importer('/Users/Chris/Documents/Addenbrookes Project/SCBU.xlsx', con)
         _if.read_admissions()
         _if.read_isolates()
-         
+            
     def test_get_patient(self):
         con = Store.Store('GISMOH', 'gismoh2')
         pat = con.fetch('Patient:1.0')
         assert pat.value['uniq_id'] == 1
-         
+            
     def test_get_location(self):
         con = Store.Store('GISMOH', 'gismoh2')
         pat = con.fetch('Location:229.0:1320343200.0')
         assert pat.value['patient_id'] == 229.0
-        
+           
     def test_get_result(self):
-         
+            
         con = Store.Store('GISMOH', 'gismoh2')
         res = con.fetch('Result:2495.0:Disc Diffusion:2011-01-10')
 
@@ -168,12 +168,19 @@ class Antibiogram_test(TestCase):
         _abm = Antibiogram(Store.Store('GISMOH', 'gismoh2'))
         _abl = _abm.get_nearest(self.ab1)
         
-        print _abl
-        
         for ab in _abl:
             assert ab['similarity'] == 1
 
+    def test_get_nearest_n(self):
         
+        _abm = Antibiogram(Store.Store('GISMOH', 'gismoh2'))
+        _abl = _abm.get_nearest(self.ab1, n = 5)
+        
+        assert len(_abl) <= 5
+        
+        for ab in _abl:
+            assert ab['similarity'] == 1
+    
         
         
         
