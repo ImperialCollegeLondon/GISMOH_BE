@@ -1,6 +1,6 @@
 {% extends base.html %}
 {% block startup_script %}
-		<script src="/static/require.js" type="text/javascript"  data-main="/static/test"></script>
+		<script src="/static/js/require.js" type="text/javascript"  data-main="/static/js/loader"></script>
 {% end %}
 
 {% block title %}
@@ -8,5 +8,20 @@
 {% end %}
 
 {% block content %}
-	<h2>Under construction</h2>
+	<section class="row-fluid">
+		<div id="linker" class="span6"></div>
+		<div id="patient_list" class="span6"></div>
+	</section>
+	<script type="text/template" id="patient_template">
+		<div>
+			<%- patient_id %>
+			<span class="status" title="<%= type%> patient">
+				<span class="icon-white <% if (type == "positive") { %> icon-warning-sign <%} else {%!> icon-info-sign <% } %>"></span>
+			</span>
+			<span class="relation">
+				<span class="icon-white"></span>
+			</span>
+		</div>
+		<div><%- location.speciality %> | <%- location.ward %></div>
+	</script>
 {% end %}

@@ -31,7 +31,7 @@ class MainHandler(tornado.web.RequestHandler):
 class Antibiogram_Test(tornado.web.RequestHandler):
     def get(self):
         
-        iso_id = float(get_arg_or_default(self,'isolate_id', 1.0))
+        iso_id = float(get_arg_or_default(self,'patient_id', 1))
 
         _store = Store.Store('GISMOH', 'gismoh2')
   
@@ -43,12 +43,12 @@ class Antibiogram_Test(tornado.web.RequestHandler):
         ab_list = []
         
         for ab_i in abs :
-            
             ab = _store.fetch(ab_i.docid).value
-
-            ab_list = ab_list + [x['Antibiotic'] for x in ab['result']]
+            if ab['result'] is not None:
+                ab_list = ab_list + [x['Antibiotic'] for x in ab['result']]
             
-            aaaaa = _abm.get_nearest(ab, None, 11.5/12.0, gap_penalty = 0.25)
+            aaaaa = aaaaa + _abm.get_nearest(ab, None, 11/12.0, gap_penalty = 0.25)
+        
         
         self.add_header('Content-type', 'application/json')
         self.write(json.dumps(aaaaa))
@@ -87,18 +87,24 @@ class RiskAndPositiveHandler(tornado.web.RequestHandler):
         patients = {}
         
         for loc in Store.Location.get_locations_at(_store, at_date):
-            pat = { 'patient_id' : loc.patient_id, 'location' : loc.get_dict() } #, 'admission' : Store.Admission.get_by_key(_store, loc.admission_id).get_dict() }
+            pat = { 'patient_id' : loc.patient_id, 'location' : loc.get_dict(), 'admission' : Store.Admission.get_by_key(_store, loc.admission_id).get_dict() }
             patients[str(loc.patient_id)] = pat
             
-        for res_res in _store.get_next_from('Results'):
+        qry = _store.create_query()
+        #qry.mapkey_multi = [[key] for key in patients.keys()] 
+        res = _store.get_view('Results', query=qry)
+        for res_res in res:
+         
             res = Store.Result.get_by_key(_store, res_res.docid)
             iso = Store.Isolate.get_by_key(_store, res.isolate_id)
-
-            if patients.has_key(iso.patient_id):
+            
+            if patients.has_key(str(iso.patient_id)):
+                str_taken = iso.date_taken
                 patients[str(iso.patient_id)]['ab'] = res.get_dict()
-         
+                patients[str(iso.patient_id)]['type'] = 'positive' if str_taken > patients[str(iso.patient_id)]['admission']['start_date'] and str_taken < patients[str(iso.patient_id)]['admission']['end_date'] else 'risk'
+                
         self.add_header('Content-type', 'application/json')
-        self.write(json.dumps(patients))   
+        self.write(json.dumps([pat for pat in sorted(patients.values(), key = lambda obj : obj['patient_id']) if pat.has_key('ab') ]))   
             
         
 

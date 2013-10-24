@@ -40,14 +40,14 @@ class Store:
 
     def get_from_view_by_key(self, name, key):
         
-        _query = views.params.Query()
+        _query = self.create_query()
         _query.mapkey_single = key
         _view = self.get_view(name, _query)
         
         return _view
     
         
-    
+## Base class describing functions shared by GISMOH objects   
 class GISMOH_Object(object):
 
     def get_key(self):
@@ -161,7 +161,8 @@ class Location(GISMOH_Object):
     def get_locations_at(store, qry_date):
         """! 
             get locations of patients at date_str
-            @param qry_date
+            @param store Store.Store: the store to get the data from
+            @param qry_date datetime.datetime: the date and time at which we want to look
         """
         
         q_date_string = qry_date.strftime('%Y-%m-%d %H:%M:%S')
@@ -224,6 +225,28 @@ class Result(GISMOH_Object):
     result_type = None
     test_date = None
     isolate_id = None
+    hash = None
+    patient_id = None
     
     def get_key(self):
         return '%s:%s:%s' % (self.isolate_id, self.test_type, self.test_date.strftime('%Y-%m-%d'))
+    
+    def get_hash(self):
+        import md5
+        from json import dumps
+        if self.result_type == 'Antibiogram' and self.result is not None:
+            m = md5.new()
+            m.update(dumps([ {ab['Antibiotic'] : ab['SIR'] for ab in self.result } ]))
+            return str(m.hexdigest())
+            
+    def from_dict(self, _dict, _map = None):
+        super(Result, self).from_dict(_dict, _map)
+        if not self.hash:
+            self.hash = self.get_hash()
+            
+    def get_dict(self):
+        if not self.hash:
+            self.hash = self.get_hash()
+        
+        return super(Result, self).get_dict()
+        

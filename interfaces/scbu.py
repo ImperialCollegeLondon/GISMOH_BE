@@ -123,6 +123,7 @@ class SCBU_Importer(object):
         _result.isolate_id = _dict['Isolate_Number']
         _result.test_date = _iso.date_taken
         _result.result = []
+        _result.patient_id = _dict['Patient_Number']
         
         if _dict['MRSA'] == 1.0:
             for h in headers:
@@ -136,6 +137,8 @@ class SCBU_Importer(object):
                     _result.result.append(ab_dict)
         else:
             _result.result = None
+            
+        print 'result'
         self.store.save(_iso)
         self.store.save(_result)
 #     def read_admission(self, row, headers):

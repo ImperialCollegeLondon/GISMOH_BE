@@ -9,6 +9,9 @@ class Antibiogram(object):
     # @param ab1 Store.Result: 
     # @param ab2 Store.Result: 
     def compare(self, ab1, ab2, mismatch_penalty = 1.0, gap_penalty = 0.5):
+        if ab1['result'] is None or ab2 ['result'] is None:
+            return 0
+        
         res1 = {}
         res2 = {}
         mismatches = 0
@@ -39,24 +42,21 @@ class Antibiogram(object):
         
         results = []
         
-        
-        for doc in self.store.get_next_from('Results'):
+        res_ = self.store.get_view('Results', query = self.store.create_query())
+        for doc in res_:
             ab2 = self.store.fetch(doc.docid).value
             res = self.compare(ab1, ab2, mismatch_penalty, gap_penalty)
             
             if res >= cutoff:
                 results.append({ 'Result' : ab2, 'similarity' : res } )
+        
       
         sorted_results = sorted(results, key = lambda obj : obj['similarity'], reverse = True)
         if n is not None:
             return sorted_results[0:n]
         else:
             return sorted_results
-        
-            
-        
-                
-            
+
                 
     def getAllWith(self, prop, param):
         pass
