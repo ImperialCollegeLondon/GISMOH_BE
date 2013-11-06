@@ -1,16 +1,20 @@
 {% extends base.html %}
 {% block startup_script %}
-		<script src="/static/js/require.js" type="text/javascript"  data-main="/static/js/loader"></script>
+		<title>GISMOH</title>
 {% end %}
 
 {% block title %}
 	<h1>GISMOH</h1>
+	<img src="/static/img/loading-sm.gif" style="display:none" />
 {% end %}
 
 {% block content %}
 	<section class="row-fluid">
 		<div id="linker" class="span6"></div>
 		<div id="patient_list" class="span6"></div>
+	</section>
+	<section class="row-fluid">
+		<div id="timeline"></div>
 	</section>
 	<script type="text/template" id="patient_template">
 		<div>
@@ -24,4 +28,5 @@
 		</div>
 		<div><%- location.speciality %> | <%- location.ward %></div>
 	</script>
+	<script src="/static/js/require.js" type="text/javascript"  data-main="/static/js/loader"></script>
 {% end %}

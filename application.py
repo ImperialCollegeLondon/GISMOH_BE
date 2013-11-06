@@ -1,5 +1,6 @@
 import tornado.ioloop
 import tornado.web
+from tornado import gen
 
 import json
 from os import path
@@ -31,27 +32,28 @@ class MainHandler(tornado.web.RequestHandler):
 class Antibiogram_Test(tornado.web.RequestHandler):
     def get(self):
         
-        iso_id = float(get_arg_or_default(self,'patient_id', 1))
-
+        patient_id = float(get_arg_or_default(self,'patient_id', 1))
+        at_date = datetime.datetime.strptime(get_arg_or_default(self,'at_date', datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')), '%Y-%m-%d %H:%M:%S')
+        
         _store = Store.Store('GISMOH', 'gismoh2')
   
         _abm = Antibiogram(_store)
         
-        abs = _store.get_from_view_by_key('Results', iso_id)
+        abs = _store.get_from_view_by_key('Results', patient_id)
         
-        aaaaa = []
-        ab_list = []
+        f_list = []
+        p_list = []
         
         for ab_i in abs :
             ab = _store.fetch(ab_i.docid).value
-            if ab['result'] is not None:
-                ab_list = ab_list + [x['Antibiotic'] for x in ab['result']]
+            for ab in _abm.get_nearest(ab, None, 11.5/12.0, gap_penalty = 0.25):
+                if not p_list.__contains__(ab['Result']['patient_id']) and ab['Result']['test_date'] < at_date.strftime('%Y-%m-%d %H:%M:%S') and ab['Result']['patient_id'] != patient_id:
+                    f_list.append(ab)
+                    p_list.append(ab['Result']['patient_id'])
             
-            aaaaa = aaaaa + _abm.get_nearest(ab, None, 11/12.0, gap_penalty = 0.25)
-        
-        
+             
         self.add_header('Content-type', 'application/json')
-        self.write(json.dumps(aaaaa))
+        self.write(json.dumps(f_list))
 
 @require_basic_auth('GISMOH', ldapauth.auth_user_ldap) 
 class OverlapHandler(tornado.web.RequestHandler):
@@ -59,22 +61,28 @@ class OverlapHandler(tornado.web.RequestHandler):
         from modules.Location import LocationInterface
         import datetime
         
-        patient_id = float(get_arg_or_default(self,'patient_id', 1.0))
+        self.add_header('Content-type', 'application/json')
+        
+        patient_id = float(get_arg_or_default(self,'patient_id', 0.0))
         date_from = datetime.datetime.strptime(get_arg_or_default(self,'from', (datetime.datetime.now() - datetime.timedelta(days=7)).strftime('%Y-%m-%d %H:%M:%S')), '%Y-%m-%d %H:%M:%S')
         date_to = datetime.datetime.strptime(get_arg_or_default(self,'to', datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')), '%Y-%m-%d %H:%M:%S')
         
-        _store = Store.Store('GISMOH', 'gismoh2')
+        if patient_id == 0.0 :
+            self.write('[]')
+        else:
+            _store = Store.Store('GISMOH', 'gismoh2')
+            
+            patient = Store.Patient.get_by_key(_store, patient_id)
+            _loc_if = LocationInterface(_store)
         
-        patient = Store.Patient.get_by_key(_store, patient_id)
-        _loc_if = LocationInterface(_store)
-    
-        olaps = _loc_if.get_overlaps_with_patient(patient)
-    
-        for k in olaps:
-            olaps[k] = [o.get_dict() for o in olaps[k]]
-    
-        self.add_header('Content-type', 'application/json')
-        self.write(json.dumps(olaps))
+            olaps = _loc_if.get_overlaps_with_patient(patient)
+            olap_list = []
+            
+            for k in olaps:
+                olap_list += [o.get_dict() for o in olaps[k]]
+        
+            
+            self.write(json.dumps(olap_list))
 
 @require_basic_auth('GISMOH', ldapauth.auth_user_ldap) 
 class RiskAndPositiveHandler(tornado.web.RequestHandler):
@@ -97,6 +105,10 @@ class RiskAndPositiveHandler(tornado.web.RequestHandler):
          
             res = Store.Result.get_by_key(_store, res_res.docid)
             iso = Store.Isolate.get_by_key(_store, res.isolate_id)
+            
+            if iso.date_taken > at_date.strftime('%Y-%m-%d %H:%M:%S') or not res.result:
+                
+                continue
             
             if patients.has_key(str(iso.patient_id)):
                 str_taken = iso.date_taken

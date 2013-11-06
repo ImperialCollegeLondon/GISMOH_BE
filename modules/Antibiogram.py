@@ -36,7 +36,7 @@ class Antibiogram(object):
                 mismatches += 1.0
             ttl += 1
 
-        return 1.0 - ((mismatches * mismatch_penalty) + (gaps * gap_penalty)) / ttl
+        return (1.0 - ((mismatches * mismatch_penalty) + (gaps * gap_penalty)) / ttl) if ttl > 0 else 0 
 
     def get_nearest(self, ab1, n = None, cutoff = 1.0, mismatch_penalty = 1.0, gap_penalty = 0.5):
         
@@ -50,12 +50,11 @@ class Antibiogram(object):
             if res >= cutoff:
                 results.append({ 'Result' : ab2, 'similarity' : res } )
         
-      
-        sorted_results = sorted(results, key = lambda obj : obj['similarity'], reverse = True)
         if n is not None:
+            sorted_results = sorted(results, key = lambda obj : obj['similarity'], reverse = True)
             return sorted_results[0:n]
         else:
-            return sorted_results
+            return results
 
                 
     def getAllWith(self, prop, param):

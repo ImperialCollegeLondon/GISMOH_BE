@@ -239,14 +239,4 @@ class Result(GISMOH_Object):
             m.update(dumps([ {ab['Antibiotic'] : ab['SIR'] for ab in self.result } ]))
             return str(m.hexdigest())
             
-    def from_dict(self, _dict, _map = None):
-        super(Result, self).from_dict(_dict, _map)
-        if not self.hash:
-            self.hash = self.get_hash()
-            
-    def get_dict(self):
-        if not self.hash:
-            self.hash = self.get_hash()
-        
-        return super(Result, self).get_dict()
         

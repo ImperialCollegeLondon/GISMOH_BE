@@ -1,4 +1,4 @@
-define(['backbone', 'underscore'], function(){
+define(['backbone', 'underscore', 'strftime'], function(ig, no, strfdate){
 	var PatientList = {}
 	
 	PatientList.Patient = Backbone.Model.extend({
@@ -15,9 +15,6 @@ define(['backbone', 'underscore'], function(){
 		events : '',
 		initialize: function() {
 	      this.listenTo(this.model, 'change', this.render);
-	      
-	  
-	      
 	    },
 	    template : _.template($('#patient_template').html()),
 		render : function()
@@ -32,8 +29,14 @@ define(['backbone', 'underscore'], function(){
 	
 	
 	PatientList.PatientList = Backbone.View.extend({
+		selected_id : null,
 		events : {
 			'click li' : 'selectPatient'
+		},
+		
+		abortRequest : function()
+		{
+			if (this.req && this.req.readyState > 0 && this.req.readyState < 4) this.req.abort();
 		},
 		addOne : function(item)
 		{
@@ -46,6 +49,13 @@ define(['backbone', 'underscore'], function(){
 		},
 		initialize: function()
 		{
+			this.$el.addClass('gismoh_plugin');
+			this.collection = new PatientList.PatientCollection();
+			
+			this.router = this.options.router;
+			
+			this.router.on('route:selected', this.selectedPatient, this);
+			
 			this.listenTo(this.collection, 'add', this.addOne);
 			this.listenTo(this.collection, 'reset', this.addAll);
 			this.listenTo(this.collection, 'all', this.render);
@@ -67,6 +77,12 @@ define(['backbone', 'underscore'], function(){
 			{
 				this.addAll();
 			}
+			
+			if( this.selected_id )
+			{
+				this.selectedPatient(this.selected_id)
+			}
+			
 			return this;
 		},
 		setLoading : function()
@@ -86,7 +102,24 @@ define(['backbone', 'underscore'], function(){
 				tgt = tgt.parents('.patient')
 			}
 			tgt.addClass('selected');
-		}
+			this.selected_id = tgt.prop('id');
+			this.router.navigate('patient/' + tgt.prop('id'), { trigger : true, replace:true });
+		},
+		selectedPatient: function(id)
+		{
+			this.selected_id = id;
+			$('.patient', this.$el).removeClass('selected');
+			$('#' + id, this.$el).addClass('selected');
+		},
+		setDateTime : function(dt)
+		{
+			this.abortRequest();
+			this.req = this.collection.fetch({ data : { 
+					at_date : strftime('%Y-%m-%d %H:%M:%S', dt) 
+				}
+			});
+		},
+		router : null
 	});
 	
 
