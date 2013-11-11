@@ -5,7 +5,7 @@
 
 {% block title %}
 	<h1>GISMOH</h1>
-	<img src="/static/img/loading-sm.gif" style="display:none" />
+	<img src="/static/img/loading-sm.gif" style="display:none" /><!-- image pre-loading -->
 {% end %}
 
 {% block content %}
@@ -14,7 +14,7 @@
 		<div id="patient_list" class="span6"></div>
 	</section>
 	<section class="row-fluid">
-		<div id="timeline"></div>
+		<div id="timeline" class="span12"></div>
 	</section>
 	<script type="text/template" id="patient_template">
 		<div>

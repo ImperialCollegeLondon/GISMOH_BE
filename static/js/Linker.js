@@ -1,24 +1,5 @@
 define(['backbone', 'underscore', 'raphael'], function(){
 	var Linker = {};
-
-	Linker.LocationLink = Backbone.Model.extend({
-		
-	});
-	
-	Linker.BioLink = Backbone.Model.extend({
-		
-	});
-	
-	Linker.LocationLinkCollection = Backbone.Collection.extend({
-		model: Linker.LocationLink,
-		url : '/overlaps'
-	});
-	
-	Linker.BioLinkCollection = Backbone.Collection.extend({
-		model: Linker.BioLink,
-		url : '/antibiogram'
-	});
-	
 	
 	Linker.Graph = Backbone.View.extend({
 		events : {
@@ -30,8 +11,8 @@ define(['backbone', 'underscore', 'raphael'], function(){
 			if (this.lreq && this.lreq.readyState > 0 && this.lreq.readyState < 4) this.lreq.abort();
 		},
 		initialize: function(){
-			this.loc_collection = new Linker.LocationLinkCollection();
-			this.bio_collection = new Linker.BioLinkCollection();
+			this.loc_collection = this.options.loc_collection;
+			this.bio_collection = this.options.bio_collection;
 			
 			this.$el.addClass('gismoh_plugin');
 			

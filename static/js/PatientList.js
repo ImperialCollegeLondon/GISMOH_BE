@@ -1,14 +1,6 @@
 define(['backbone', 'underscore', 'strftime'], function(ig, no, strfdate){
 	var PatientList = {}
-	
-	PatientList.Patient = Backbone.Model.extend({
-		idAttribute : 'patient_id'
-	});
-	
-	PatientList.PatientCollection = Backbone.Collection.extend({
-		model : PatientList.Patient,
-		url : '/risk_patients'
-	});
+
 	
 	PatientList.PatientItem = Backbone.View.extend({
 		tagName : 'li',
@@ -50,7 +42,7 @@ define(['backbone', 'underscore', 'strftime'], function(ig, no, strfdate){
 		initialize: function()
 		{
 			this.$el.addClass('gismoh_plugin');
-			this.collection = new PatientList.PatientCollection();
+			//this.collection = new PatientList.PatientCollection();
 			
 			this.router = this.options.router;
 			
@@ -59,8 +51,8 @@ define(['backbone', 'underscore', 'strftime'], function(ig, no, strfdate){
 			this.listenTo(this.collection, 'add', this.addOne);
 			this.listenTo(this.collection, 'reset', this.addAll);
 			this.listenTo(this.collection, 'all', this.render);
-			this.listenTo(this.collection, 'request', this.setLoading)
-			this.listenTo(this.collection, 'sync', this.unsetLoading)
+			this.listenTo(this.collection, 'request', this.setLoading);
+			this.listenTo(this.collection, 'sync', this.unsetLoading);
 		},
 		render : function(){
 			this.$el.empty();

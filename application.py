@@ -13,8 +13,6 @@ from sec import ldapauth
 from store import Store
 from modules.Antibiogram import Antibiogram
 
-print 'started'
-
 def get_arg_or_default(torn, argname, default):
     try:
         arg = torn.get_argument(argname)
@@ -30,6 +28,7 @@ class MainHandler(tornado.web.RequestHandler):
         
 @require_basic_auth('GISMOH', ldapauth.auth_user_ldap)
 class Antibiogram_Test(tornado.web.RequestHandler):
+    @tornado.web.asynchronous
     def get(self):
         
         patient_id = float(get_arg_or_default(self,'patient_id', 1))
@@ -53,10 +52,11 @@ class Antibiogram_Test(tornado.web.RequestHandler):
             
              
         self.add_header('Content-type', 'application/json')
-        self.write(json.dumps(f_list))
+        self.finish(json.dumps(f_list))
 
 @require_basic_auth('GISMOH', ldapauth.auth_user_ldap) 
 class OverlapHandler(tornado.web.RequestHandler):
+    @tornado.web.asynchronous
     def get(self):
         from modules.Location import LocationInterface
         import datetime
@@ -80,12 +80,13 @@ class OverlapHandler(tornado.web.RequestHandler):
             
             for k in olaps:
                 olap_list += [o.get_dict() for o in olaps[k]]
-        
+                
             
-            self.write(json.dumps(olap_list))
+            self.finish(json.dumps(sorted(olap_list, key= lambda obj : obj['patient_id'])))
 
 @require_basic_auth('GISMOH', ldapauth.auth_user_ldap) 
 class RiskAndPositiveHandler(tornado.web.RequestHandler):
+    @tornado.web.asynchronous
     def get(self):
 
         _store = Store.Store('GISMOH', 'gismoh2')
@@ -116,7 +117,7 @@ class RiskAndPositiveHandler(tornado.web.RequestHandler):
                 patients[str(iso.patient_id)]['type'] = 'positive' if str_taken > patients[str(iso.patient_id)]['admission']['start_date'] and str_taken < patients[str(iso.patient_id)]['admission']['end_date'] else 'risk'
                 
         self.add_header('Content-type', 'application/json')
-        self.write(json.dumps([pat for pat in sorted(patients.values(), key = lambda obj : obj['patient_id']) if pat.has_key('ab') ]))   
+        self.finish(json.dumps([pat for pat in sorted(patients.values(), key = lambda obj : obj['patient_id']) if pat.has_key('ab') ]))   
             
         
 
