@@ -6,18 +6,39 @@ from couchbase import Couchbase, views
 import datetime
 from time import mktime
 
+TIME_FORMAT = '%Y-%m-%dT%H:%M:%S'
+
 ## Connection to a database
 class Store:
     db = None
     
-    def __init__(self, bucket, password=None):
-        self.db = Couchbase.connect(bucket=bucket, password=password)
+    def __init__(self, bucket, password=None, host='127.0.0.1'):
+        self.db = Couchbase.connect(bucket=bucket,host=host, password=password)
     
     def save(self, obj):
         self.db.set(u"%s:%s" % (obj.get_type() ,obj.get_key()), obj.get_dict())
     
     def fetch(self, key):
-        return self.db.get(key)
+        if type(key).__name__ == 'list' :
+            return self.db.get_multi(key)
+        else:
+            return self.db.get(key)
+
+    def fetch_objects(self, keys):
+        get_class = lambda x: globals()[x]
+
+        _dicts = self.fetch(keys)
+
+        objs = []
+        for _dict in _dicts.values():
+
+            cls = get_class(_dict.value['type'])
+            obj = cls()
+            obj.from_dict(_dict.value)
+            objs.append(obj)
+
+        return objs
+
       
     def get_view(self, name, query = None, limit = None, dev = True):
         
@@ -63,7 +84,7 @@ class GISMOH_Object(object):
             if type(obj_dict[prop]) == datetime.date:
                 obj_dict[prop] = obj_dict[prop].strftime('%Y-%m-%d')
             elif type(obj_dict[prop]) == datetime.datetime:
-                obj_dict[prop] = obj_dict[prop].strftime('%Y-%m-%d %H:%M:%S')
+                obj_dict[prop] = obj_dict[prop].strftime(TIME_FORMAT)
             elif type(obj_dict[prop]) == datetime.time:
                  obj_dict[prop] = obj_dict[prop].strftime('%H:%M:%S')
                  
@@ -106,10 +127,10 @@ class Admission(GISMOH_Object):
         super(Admission, self).from_dict(_dict, _map)
         
         if type(self.start_date) == unicode or type(self.start_date) == str:
-            self.start_date = datetime.datetime.strptime(self.start_date, '%Y-%m-%d %H:%M:%S')
+            self.start_date = datetime.datetime.strptime(self.start_date, TIME_FORMAT)
          
         if type(self.end_date) == unicode or type(self.end_date) == str :
-            self.end_date = datetime.datetime.strptime(self.end_date, '%Y-%m-%d %H:%M:%S')       
+            self.end_date = datetime.datetime.strptime(self.end_date, TIME_FORMAT)
     
     @staticmethod
     def get_admissions_at(store, qry_date):
@@ -118,7 +139,7 @@ class Admission(GISMOH_Object):
             @param qry_date
         """
         
-        q_date_string = qry_date.strftime('%Y-%m-%d %H:%M:%S')
+        q_date_string = qry_date.strftime(TIME_FORMAT)
         
         qry = store.create_query()
         qry.mapkey_range=['', q_date_string]
@@ -137,7 +158,27 @@ class Isolate(GISMOH_Object):
     def get_key(self):
         return self.lab_number
     
+    def from_dict(self, _dict, _map = None):
+        super(Isolate, self).from_dict(_dict, _map)
+
+        if type(self.date_taken) == unicode or type(self.date_taken) == str:
+            self.date_taken = datetime.datetime.strptime(self.date_taken, TIME_FORMAT)
+
+    @staticmethod
+    def get_isolates_taken_between(store, from_date, to_date):
+        q_start_string = from_date.strftime(TIME_FORMAT)
+        q_end_string = to_date.strftime(TIME_FORMAT)
+
+        qry = store.create_query()
+        qry.mapkey_range=[q_start_string, q_end_string]
+        qry.inclusive_end = True
+
+        keys = [i_res.docid for i_res in store.get_view('isolates_by_date_taken',query=qry, dev=True)]
+        return store.fetch_objects(keys)
+
+
 class Location(GISMOH_Object):
+    uniq_id = None
     ward= None
     specialty = None
     arrived = None
@@ -145,17 +186,18 @@ class Location(GISMOH_Object):
     patient_id = None
     
     def get_key(self):
-         return "%s:%s" % (self.patient_id, mktime(self.arrived.timetuple()))
+         return self.uniq_id
      
     def from_dict(self, _dict, _map = None):
         super(Location, self).from_dict(_dict, _map)
         
         if type(self.arrived) == unicode or type(self.arrived) == str:
-            self.arrived = datetime.datetime.strptime(self.arrived, '%Y-%m-%d %H:%M:%S')
+            self.arrived = datetime.datetime.strptime(self.arrived, TIME_FORMAT)
          
         if type(self.left) == unicode or type(self.left) == str:
-            self.left = datetime.datetime.strptime(self.left, '%Y-%m-%d %H:%M:%S')
-    
+            self.left = datetime.datetime.strptime(self.left, TIME_FORMAT)
+
+        self.uniq_id = "%s:%s" % (self.patient_id, mktime(self.arrived.timetuple()))
     
     @staticmethod
     def get_locations_at(store, qry_date):
@@ -165,14 +207,40 @@ class Location(GISMOH_Object):
             @param qry_date datetime.datetime: the date and time at which we want to look
         """
         
-        q_date_string = qry_date.strftime('%Y-%m-%d %H:%M:%S')
+        q_date_string = qry_date.strftime(TIME_FORMAT)
         
         qry = store.create_query()
         qry.mapkey_range=['', q_date_string]
         
+        keys= []
+
         for l_res in store.get_view('Location_by_start_date',query=qry, dev=True):
             if l_res.value is None or l_res.value  > q_date_string :
-                yield Location.get_by_key(store, l_res.docid)
+                keys.append(l_res.docid)
+
+        return store.fetch_objects(keys)
+
+    @staticmethod
+    def get_locations_between(store, from_date, to_date):
+        """!
+            get locations of patients at date_str
+            @param store Store.Store: the store to get the data from
+            @param qry_date datetime.datetime: the date and time at which we want to look
+        """
+
+        q_date_string = from_date.strftime(TIME_FORMAT)
+        q_end_string = to_date.strftime(TIME_FORMAT)
+
+        qry = store.create_query()
+        qry.mapkey_range=['', q_end_string] #we're using start date so it has to be before the end date.
+        qry.inclusive_end=True
+        keys= []
+
+        for l_res in store.get_view('Location_by_start_date',query=qry, dev=True):
+            if l_res.value is None or l_res.value > q_date_string :
+                keys.append(l_res.docid)
+
+        return store.fetch_objects(keys)
 
 class Patient(GISMOH_Object):
     """
@@ -239,4 +307,3 @@ class Result(GISMOH_Object):
             m.update(dumps([ {ab['Antibiotic'] : ab['SIR'] for ab in self.result } ]))
             return str(m.hexdigest())
             
-        

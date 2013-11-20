@@ -110,7 +110,7 @@ define(['backbone', 'underscore', 'strftime'], function (ig, no, strfdate) {
 				var tick = this.canvas.path('M ' + x + ' 20 L ' + x + ' ' + this.size[1]);
 				tick.attr('stroke', '#444');
 				
-				var label = this.canvas.text(x, 13, strftime('%d/%m/%Y', d));
+				var label = this.canvas.text(x, 13, d.strftime('%d/%m/%Y'));
 				label.attr('fill', '#444');
 				label.attr('font-size', 15);
 			}

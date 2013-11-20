@@ -80,7 +80,7 @@ define(['backbone', 'underscore', 'raphael'], function(){
 			lbl.attr('fill', '#FFF');
 			lbl.attr('font-size', 16);
 			this.loc_collection.reset();
-			this.lreq = this.loc_collection.fetch({data:{patient_id: this.selected_id,  at_date : strftime('%Y-%m-%d %H:%M:%S',  this.datetime) }});
+			this.lreq = this.loc_collection.fetch({data:{patient_id: this.selected_id,  at_date : this.datetime.strftime('%Y-%m-%d %H:%M:%S',  this.datetime) }});
 		},
 		addOne : function(model, i)
 		{
@@ -148,7 +148,7 @@ define(['backbone', 'underscore', 'raphael'], function(){
 			
 			if(this.selected_id)
 			{
-				this.breq = this.bio_collection.fetch({data:{patient_id: this.selected_id,  at_date : strftime('%Y-%m-%d %H:%M:%S',  this.datetime) }});
+				this.breq = this.bio_collection.fetch({data:{patient_id: this.selected_id,  at_date :  this.datetime.strftime('%Y-%m-%d %H:%M:%S') }});
 			}
 			else
 			{
@@ -161,7 +161,7 @@ define(['backbone', 'underscore', 'raphael'], function(){
 			this.abortRequest();
 			if(this.selected_id)
 			{
-				this.breq = this.bio_collection.fetch({data:{patient_id: this.selected_id,  at_date : strftime('%Y-%m-%d %H:%M:%S',  this.datetime) }});
+				this.breq = this.bio_collection.fetch({data:{patient_id: this.selected_id,  at_date : this.datetime.strftime('%Y-%m-%d %H:%M:%S') }});
 			}
 			else
 			{

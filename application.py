@@ -1,6 +1,9 @@
+
+#from plop.collector import Collector
 import tornado.ioloop
 import tornado.web
 from tornado import gen
+from tornado.options import parse_command_line, define, options
 
 import json
 from os import path
@@ -12,6 +15,12 @@ from sec import ldapauth
 
 from store import Store
 from modules.Antibiogram import Antibiogram
+from modules.Location import LocationInterface
+
+define('port', default=8800)
+define('output_file', default='profile.out')
+define('time_format', default='%Y-%m-%dT%H:%M:%S')
+print "reloaded"
 
 def get_arg_or_default(torn, argname, default):
     try:
@@ -21,56 +30,98 @@ def get_arg_or_default(torn, argname, default):
     return arg
 
 ##Index page handler
-@require_basic_auth('GISMOH', ldapauth.auth_user_ldap)
+#@require_basic_auth('GISMOH', ldapauth.auth_user_ldap)
 class MainHandler(tornado.web.RequestHandler):
     def get(self):
         self.render('main.html')#,test_val=rowout)
         
-@require_basic_auth('GISMOH', ldapauth.auth_user_ldap)
+#@require_basic_auth('GISMOH', ldapauth.auth_user_ldap)
 class Antibiogram_Test(tornado.web.RequestHandler):
     @tornado.web.asynchronous
     def get(self):
+        self.set_header("Access-Control-Allow-Origin", "http://localhost:9000")
         
-        patient_id = float(get_arg_or_default(self,'patient_id', 1))
-        at_date = datetime.datetime.strptime(get_arg_or_default(self,'at_date', datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')), '%Y-%m-%d %H:%M:%S')
-        
-        _store = Store.Store('GISMOH', 'gismoh2')
-  
-        _abm = Antibiogram(_store)
-        
-        abs = _store.get_from_view_by_key('Results', patient_id)
-        
-        f_list = []
-        p_list = []
-        
-        for ab_i in abs :
-            ab = _store.fetch(ab_i.docid).value
-            for ab in _abm.get_nearest(ab, None, 11.5/12.0, gap_penalty = 0.25):
-                if not p_list.__contains__(ab['Result']['patient_id']) and ab['Result']['test_date'] < at_date.strftime('%Y-%m-%d %H:%M:%S') and ab['Result']['patient_id'] != patient_id:
-                    f_list.append(ab)
-                    p_list.append(ab['Result']['patient_id'])
-            
-             
-        self.add_header('Content-type', 'application/json')
+        try:
+            patient_id = float(get_arg_or_default(self,'patient_id', 1))
+            at_date = datetime.datetime.strptime(get_arg_or_default(self,'at_date', datetime.datetime.now().strftime(options.time_format)), options.time_format)
+
+            _store = Store.Store('gismoh', 'gismohgismoh2', 'fi--didewgstdb1.dide.local')
+            #instance of the antibiogram module
+            _abm = Antibiogram(_store)
+            _abs = _store.get_from_view_by_key('Results', patient_id)
+
+
+            f_list = []
+            p_list = []
+
+            ab_list = _store.fetch(list(set([ unicode(obj.docid) for obj in _abs ])))
+
+            for abx in ab_list.values() :
+                for ab in _abm.get_nearest(abx.value, None, 11.5/12.0, gap_penalty = 0.25):
+                    if not p_list.__contains__(ab['Result']['patient_id']) and ab['Result']['test_date'] < at_date.strftime(options.time_format) and ab['Result']['patient_id'] != patient_id:
+                        f_list.append(ab)
+                        p_list.append(ab['Result']['patient_id'])
+
+
+            self.add_header('Content-type', 'application/json')
+        except:
+          f_list = []
+          print 'error'
+
         self.finish(json.dumps(f_list))
 
-@require_basic_auth('GISMOH', ldapauth.auth_user_ldap) 
+#@require_basic_auth('GISMOH', ldapauth.auth_user_ldap)
+class Locations(tornado.web.RequestHandler):
+    @tornado.web.asynchronous
+    def get(self):
+
+        self.set_header("Access-Control-Allow-Origin", "http://localhost:9000")
+        self.add_header('Content-type', 'application/json')
+        
+        from_date =  datetime.datetime.strptime(get_arg_or_default(self,'from', (datetime.datetime.now() - datetime.timedelta(days=7)).strftime(options.time_format)), options.time_format)
+        to_date =  datetime.datetime.strptime(get_arg_or_default(self,'to', (datetime.datetime.now() - datetime.timedelta(days=7)).strftime(options.time_format)), options.time_format)
+        
+        _store = Store.Store('gismoh', 'gismohgismoh2', 'fi--didewgstdb1.dide.local')
+        
+        locs = Store.Location.get_locations_between(_store, from_date, to_date)
+        loc_list = [loc.get_dict() for loc in sorted( locs, key = lambda obj : obj.patient_id)]
+        
+        self.finish(json.dumps(loc_list))
+
+#@require_basic_auth('GISMOH', ldapauth.auth_user_ldap)
+class Isolates(tornado.web.RequestHandler):
+    @tornado.web.asynchronous
+    def get(self):
+
+        self.set_header("Access-Control-Allow-Origin", "http://localhost:9000")
+        self.add_header('Content-type', 'application/json')
+
+        from_date =  datetime.datetime.strptime(get_arg_or_default(self,'from', (datetime.datetime.now() - datetime.timedelta(days=7)).strftime(options.time_format)), options.time_format)
+        to_date =  datetime.datetime.strptime(get_arg_or_default(self,'to', (datetime.datetime.now() - datetime.timedelta(days=7)).strftime(options.time_format)), options.time_format)
+
+        _store = Store.Store('gismoh', 'gismohgismoh2', 'fi--didewgstdb1.dide.local')
+        isos = Store.Isolate.get_isolates_taken_between(_store, from_date, to_date)
+
+        iso_list = [iso.get_dict() for iso in isos]
+
+        self.finish(json.dumps(iso_list))
+
+#@require_basic_auth('GISMOH', ldapauth.auth_user_ldap)
 class OverlapHandler(tornado.web.RequestHandler):
     @tornado.web.asynchronous
     def get(self):
-        from modules.Location import LocationInterface
-        import datetime
-        
+        self.set_header("Access-Control-Allow-Origin", "http://localhost:9000")
         self.add_header('Content-type', 'application/json')
         
         patient_id = float(get_arg_or_default(self,'patient_id', 0.0))
-        date_from = datetime.datetime.strptime(get_arg_or_default(self,'from', (datetime.datetime.now() - datetime.timedelta(days=7)).strftime('%Y-%m-%d %H:%M:%S')), '%Y-%m-%d %H:%M:%S')
-        date_to = datetime.datetime.strptime(get_arg_or_default(self,'to', datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')), '%Y-%m-%d %H:%M:%S')
+        date_from = datetime.datetime.strptime(get_arg_or_default(self,'from', (datetime.datetime.now() - datetime.timedelta(days=7)).strftime(options.time_format)),options.time_format)
+        date_to = datetime.datetime.strptime(get_arg_or_default(self,'to', datetime.datetime.now().strftime(options.time_format)), options.time_format)
         
         if patient_id == 0.0 :
-            self.write('[]')
+            out_obj = []
+
         else:
-            _store = Store.Store('GISMOH', 'gismoh2')
+            _store = Store.Store('gismoh', 'gismohgismoh2', 'fi--didewgstdb1.dide.local')
             
             patient = Store.Patient.get_by_key(_store, patient_id)
             _loc_if = LocationInterface(_store)
@@ -81,45 +132,53 @@ class OverlapHandler(tornado.web.RequestHandler):
             for k in olaps:
                 olap_list += [o.get_dict() for o in olaps[k]]
                 
-            
-            self.finish(json.dumps(sorted(olap_list, key= lambda obj : obj['patient_id'])))
+            out_obj = sorted(olap_list, key= lambda obj : obj['patient_id'])
 
-@require_basic_auth('GISMOH', ldapauth.auth_user_ldap) 
+        self.finish(json.dumps(out_obj))
+
+
+#@require_basic_auth('GISMOH', ldapauth.auth_user_ldap)
 class RiskAndPositiveHandler(tornado.web.RequestHandler):
     @tornado.web.asynchronous
     def get(self):
-
-        _store = Store.Store('GISMOH', 'gismoh2')
+        self.set_header("Access-Control-Allow-Origin", "http://localhost:9000")
+        _store = Store.Store('gismoh', 'gismohgismoh2', 'fi--didewgstdb1.dide.local')
         
-        at_date = datetime.datetime.strptime(get_arg_or_default(self,'at_date', datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')), '%Y-%m-%d %H:%M:%S')
+        at_date = datetime.datetime.strptime(get_arg_or_default(self,'at_date', datetime.datetime.now().strftime(options.time_format)), options.time_format)
         
         patients = {}
         
-        for loc in Store.Location.get_locations_at(_store, at_date):
+        for loc in Store.Location.get_locations_between(_store, at_date, at_date - datetime.timedelta(days=1)):
             pat = { 'patient_id' : loc.patient_id, 'location' : loc.get_dict(), 'admission' : Store.Admission.get_by_key(_store, loc.admission_id).get_dict() }
             patients[str(loc.patient_id)] = pat
             
         qry = _store.create_query()
-        #qry.mapkey_multi = [[key] for key in patients.keys()] 
         res = _store.get_view('Results', query=qry)
-        for res_res in res:
+
+        result_keys = [ obj.docid for obj in res ]
+        results = _store.fetch_objects(result_keys)
+
+        iso_keys = [ u'Isolate:%s' % obj.isolate_id for obj in results ]
+        _isolates = _store.fetch_objects(iso_keys)
+        isolates = {}
+        for _iso in _isolates:
+            isolates[_iso.lab_number] = _iso
+
+        for res in results:
          
-            res = Store.Result.get_by_key(_store, res_res.docid)
-            iso = Store.Isolate.get_by_key(_store, res.isolate_id)
+            iso = isolates[res.isolate_id]
             
-            if iso.date_taken > at_date.strftime('%Y-%m-%d %H:%M:%S') or not res.result:
-                
+            #filter out future isolates if we're using the replay functionality
+            if iso.date_taken > at_date or not res.result:
                 continue
             
             if patients.has_key(str(iso.patient_id)):
-                str_taken = iso.date_taken
+                str_taken = iso.date_taken.strftime(options.time_format)
                 patients[str(iso.patient_id)]['ab'] = res.get_dict()
                 patients[str(iso.patient_id)]['type'] = 'positive' if str_taken > patients[str(iso.patient_id)]['admission']['start_date'] and str_taken < patients[str(iso.patient_id)]['admission']['end_date'] else 'risk'
                 
         self.add_header('Content-type', 'application/json')
-        self.finish(json.dumps([pat for pat in sorted(patients.values(), key = lambda obj : obj['patient_id']) if pat.has_key('ab') ]))   
-            
-        
+        self.finish(json.dumps([pat for pat in sorted(patients.values(), key = lambda obj : obj['patient_id']) if pat.has_key('ab') ]))
 
 settings = dict(
    template_path = path.join(path.dirname(__file__), "templates"),
@@ -128,13 +187,15 @@ settings = dict(
 )
 
 application = tornado.web.Application([
-    (r'/antibiogram', Antibiogram_Test),
-    (r'/overlaps', OverlapHandler),
-    (r'/risk_patients', RiskAndPositiveHandler),
+    (r'/api/antibiogram', Antibiogram_Test),
+    (r'/api/overlaps', OverlapHandler),
+    (r'/api/locations', Locations),
+    (r'/api/isolates', Isolates),
+    (r'/api/risk_patients', RiskAndPositiveHandler),
     (r"/", MainHandler)
 ], **settings)
 
 
 if __name__ == "__main__":
-    application.listen(8888)
+    application.listen(options.port)
     tornado.ioloop.IOLoop.instance().start()

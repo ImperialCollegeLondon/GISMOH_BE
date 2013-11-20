@@ -9,7 +9,8 @@ class Antibiogram(object):
     # @param ab1 Store.Result: 
     # @param ab2 Store.Result: 
     def compare(self, ab1, ab2, mismatch_penalty = 1.0, gap_penalty = 0.5):
-        if ab1['result'] is None or ab2 ['result'] is None:
+
+        if ab1['result'] is None or ab2['result'] is None:
             return 0
         
         res1 = {}
@@ -43,8 +44,12 @@ class Antibiogram(object):
         results = []
         
         res_ = self.store.get_view('Results', query = self.store.create_query())
-        for doc in res_:
-            ab2 = self.store.fetch(doc.docid).value
+        abl = self.store.fetch(list(set([ obj.docid for obj in res_])))
+
+        for doc in abl.values():
+
+            ab2 = doc.value
+
             res = self.compare(ab1, ab2, mismatch_penalty, gap_penalty)
             
             if res >= cutoff:

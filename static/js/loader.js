@@ -38,7 +38,7 @@
 			}
 		});
 		
-		var currentDate = new Date('2011-02-18 01:00:00');
+		var currentDate = new Date('2011-02-18T01:00:00');
 		
 		var patientCollection = new Models.PatientCollection();
 		var isolateCollection = new Models.BioLinkCollection();

@@ -107,7 +107,7 @@ define(['backbone', 'underscore', 'strftime'], function(ig, no, strfdate){
 		{
 			this.abortRequest();
 			this.req = this.collection.fetch({ data : { 
-					at_date : strftime('%Y-%m-%d %H:%M:%S', dt) 
+					at_date : dt.strftime('%Y-%m-%d %H:%M:%S')
 				}
 			});
 		},

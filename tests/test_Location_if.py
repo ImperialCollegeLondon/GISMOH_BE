@@ -4,10 +4,14 @@ from unittest import TestCase
 
 import datetime
 
+CB_SERVER = 'fi--didewgstdb1.dide.local'
+CB_BUCKET = 'gismoh'
+CB_ACCESS = 'gismohgismoh2'
+
 class LocationIFTests(TestCase):
     
     def setUp(self):
-        self.con = Store.Store('GISMOH', 'gismoh2')
+        self.con = Store.Store(CB_BUCKET, CB_ACCESS, CB_SERVER)
         self._if = LocationInterface(self.con)
         
     def test_get_by_id(self):
