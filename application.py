@@ -20,7 +20,11 @@ from modules.Location import LocationInterface
 define('port', default=8800)
 define('output_file', default='profile.out')
 define('time_format', default='%Y-%m-%dT%H:%M:%S')
-print "reloaded"
+
+CB_HOST = '127.0.0.1'
+CB_BUCKET = 'GISMOH'
+CB_PASSWORD = 'gismoh2'
+
 
 def get_arg_or_default(torn, argname, default):
     try:
@@ -45,20 +49,28 @@ class Antibiogram_Test(tornado.web.RequestHandler):
             patient_id = float(get_arg_or_default(self,'patient_id', 1))
             at_date = datetime.datetime.strptime(get_arg_or_default(self,'at_date', datetime.datetime.now().strftime(options.time_format)), options.time_format)
 
-            _store = Store.Store('gismoh', 'gismohgismoh2', 'fi--didewgstdb1.dide.local')
+            isolate_id = float(get_arg_or_default(self,'isolate_id', -1))
+            
+            _store = Store.Store(CB_BUCKET, CB_PASSWORD, CB_HOST)
             #instance of the antibiogram module
             _abm = Antibiogram(_store)
-            _abs = _store.get_from_view_by_key('Results', patient_id)
-
-
-            f_list = []
-            p_list = []
-
-            ab_list = _store.fetch(list(set([ unicode(obj.docid) for obj in _abs ])))
-
+            
+            if isolate_id == -1 :
+                _abs = _store.get_from_view_by_key('Results', patient_id)
+    
+    
+                f_list = []
+                p_list = []
+    
+                ab_list = _store.fetch(list(set([ unicode(obj.docid) for obj in _abs ])))
+            else:
+                ab_list = [Store.Result.get_by_key(isolate_id)]
+        
+            print ab_list
+        
             for abx in ab_list.values() :
                 for ab in _abm.get_nearest(abx.value, None, 11.5/12.0, gap_penalty = 0.25):
-                    if not p_list.__contains__(ab['Result']['patient_id']) and ab['Result']['test_date'] < at_date.strftime(options.time_format) and ab['Result']['patient_id'] != patient_id:
+                    if not p_list.__contains__(ab['Result']['patient_id']) and ab['Result']['test_date'] <= at_date.strftime(options.time_format) and ab['Result']['patient_id'] != patient_id:
                         f_list.append(ab)
                         p_list.append(ab['Result']['patient_id'])
 
@@ -81,10 +93,10 @@ class Locations(tornado.web.RequestHandler):
         from_date =  datetime.datetime.strptime(get_arg_or_default(self,'from', (datetime.datetime.now() - datetime.timedelta(days=7)).strftime(options.time_format)), options.time_format)
         to_date =  datetime.datetime.strptime(get_arg_or_default(self,'to', (datetime.datetime.now() - datetime.timedelta(days=7)).strftime(options.time_format)), options.time_format)
         
-        _store = Store.Store('gismoh', 'gismohgismoh2', 'fi--didewgstdb1.dide.local')
+        _store = Store.Store(CB_BUCKET, CB_PASSWORD, CB_HOST)
         
         locs = Store.Location.get_locations_between(_store, from_date, to_date)
-        loc_list = [loc.get_dict() for loc in sorted( locs, key = lambda obj : obj.patient_id)]
+        loc_list = [loc.get_dict() for loc in sorted( locs, key = lambda obj : obj.patient_id)  if loc.ward == 'SCBU' ]
         
         self.finish(json.dumps(loc_list))
 
@@ -99,7 +111,7 @@ class Isolates(tornado.web.RequestHandler):
         from_date =  datetime.datetime.strptime(get_arg_or_default(self,'from', (datetime.datetime.now() - datetime.timedelta(days=7)).strftime(options.time_format)), options.time_format)
         to_date =  datetime.datetime.strptime(get_arg_or_default(self,'to', (datetime.datetime.now() - datetime.timedelta(days=7)).strftime(options.time_format)), options.time_format)
 
-        _store = Store.Store('gismoh', 'gismohgismoh2', 'fi--didewgstdb1.dide.local')
+        _store = Store.Store(CB_BUCKET, CB_PASSWORD, CB_HOST)
         isos = Store.Isolate.get_isolates_taken_between(_store, from_date, to_date)
 
         iso_list = [iso.get_dict() for iso in isos]
@@ -121,7 +133,7 @@ class OverlapHandler(tornado.web.RequestHandler):
             out_obj = []
 
         else:
-            _store = Store.Store('gismoh', 'gismohgismoh2', 'fi--didewgstdb1.dide.local')
+            _store = Store.Store(CB_BUCKET, CB_PASSWORD, CB_HOST)
             
             patient = Store.Patient.get_by_key(_store, patient_id)
             _loc_if = LocationInterface(_store)
@@ -142,7 +154,7 @@ class RiskAndPositiveHandler(tornado.web.RequestHandler):
     @tornado.web.asynchronous
     def get(self):
         self.set_header("Access-Control-Allow-Origin", "http://localhost:9000")
-        _store = Store.Store('gismoh', 'gismohgismoh2', 'fi--didewgstdb1.dide.local')
+        _store = Store.Store(CB_BUCKET, CB_PASSWORD, CB_HOST)
         
         at_date = datetime.datetime.strptime(get_arg_or_default(self,'at_date', datetime.datetime.now().strftime(options.time_format)), options.time_format)
         

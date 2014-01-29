@@ -4,9 +4,9 @@ from unittest import TestCase
 
 import datetime
 
-CB_SERVER = 'fi--didewgstdb1.dide.local'
-CB_BUCKET = 'gismoh'
-CB_ACCESS = 'gismohgismoh2'
+CB_SERVER = '127.0.0.1'
+CB_BUCKET = 'GISMOH'
+CB_ACCESS = 'gismoh2'
 
 class LocationIFTests(TestCase):
     

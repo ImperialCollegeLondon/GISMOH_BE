@@ -36,13 +36,20 @@ class Antibiogram(object):
             elif res1[key] != res2[key]:
                 mismatches += 1.0
             ttl += 1
-
-        return (1.0 - ((mismatches * mismatch_penalty) + (gaps * gap_penalty)) / ttl) if ttl > 0 else 0 
+        
+        if len(keylist) < 6 : 
+            penalty = (6 - len(keylist)) * gap_penalty
+        else:
+            penalty = 0
+        
+        return (1.0 - ((mismatches * mismatch_penalty) + (gaps * gap_penalty)) / ttl) - penalty if ttl > 0 else 0 
 
     def get_nearest(self, ab1, n = None, cutoff = 1.0, mismatch_penalty = 1.0, gap_penalty = 0.5):
         
         results = []
         
+        # replace with one call to self.store.get(Result)
+        # we need to somehow narrow down the search? Otherwise this will just take longer and longer to run
         res_ = self.store.get_view('Results', query = self.store.create_query())
         abl = self.store.fetch(list(set([ obj.docid for obj in res_])))
 
@@ -53,7 +60,7 @@ class Antibiogram(object):
             res = self.compare(ab1, ab2, mismatch_penalty, gap_penalty)
             
             if res >= cutoff:
-                results.append({ 'Result' : ab2, 'similarity' : res } )
+                results.append({ 'Result' : ab2, 'similarity' : res })
         
         if n is not None:
             sorted_results = sorted(results, key = lambda obj : obj['similarity'], reverse = True)

@@ -1,12 +1,12 @@
-import store.Store as Store
+import store.Store.CouchbaseStore as Store
 import couchbase
 from nose.tools import raises, with_setup
 import datetime
 import unittest
 
-CB_SERVER = 'fi--didewgstdb1.dide.local'
-CB_BUCKET = 'gismoh'
-CB_ACCESS = 'gismohgismoh2'
+CB_SERVER = '127.0.0.1'
+CB_BUCKET = 'GISMOH'
+CB_ACCESS = 'gismoh2'
 
 class main_test(unittest.TestCase):
     con = None

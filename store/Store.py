@@ -9,7 +9,7 @@ from time import mktime
 TIME_FORMAT = '%Y-%m-%dT%H:%M:%S'
 
 ## Connection to a database
-class Store:
+class CouchbaseStore:
     db = None
     
     def __init__(self, bucket, password=None, host='127.0.0.1'):
@@ -18,10 +18,12 @@ class Store:
     def save(self, obj):
         self.db.set(u"%s:%s" % (obj.get_type() ,obj.get_key()), obj.get_dict())
     
-    def fetch(self, key):
+    def fetch(self, cls, key):
+        #edit 
         if type(key).__name__ == 'list' :
             return self.db.get_multi(key)
         else:
+            key = '%s:%s' % (cls.__name__, key)
             return self.db.get(key)
 
     def fetch_objects(self, keys):
@@ -40,7 +42,7 @@ class Store:
         return objs
 
       
-    def get_view(self, name, query = None, limit = None, dev = True):
+    def get_view(self, name, query = None, limit = None, dev = False):
         
         doc = 'gismoh'
         
@@ -67,6 +69,33 @@ class Store:
         
         return _view
     
+class MSSQLStore:
+    db = None
+    
+    def __init__(self):
+        pass
+
+class SQLiteStore:
+    db = None
+    
+    def __init__(self, dbname):
+        import sqlite3
+        self.db = sqlite3.connect('%s.db' % dbname)
+    
+    def get(self, cls, key):
+        pass
+    
+    def save(self, obj):
+        pass
+    
+    ## find and item of type cls where 
+    def find(self, cls, **kwargs):
+        pass
+
+    @staticmethod
+    def createInsertQuery(cls):
+        for fld in vars(cls):
+            pass
         
 ## Base class describing functions shared by GISMOH objects   
 class GISMOH_Object(object):
@@ -109,7 +138,7 @@ class GISMOH_Object(object):
          if type(key) == str or type(key) == unicode:
              key = key.replace('%s:' % cls.__name__, '')
          
-         _doc = store.fetch(u'%s:%s'% (cls.__name__, key))
+         _doc = store.fetch(cls, key)
          obj = cls()
          obj.from_dict(_doc.value)
          return obj
@@ -138,7 +167,6 @@ class Admission(GISMOH_Object):
             get a list of current admissions at qry_date
             @param qry_date
         """
-        
         q_date_string = qry_date.strftime(TIME_FORMAT)
         
         qry = store.create_query()
@@ -153,7 +181,7 @@ class Isolate(GISMOH_Object):
     patient_id = None
     date_taken = None
     meta_tags = None
-    species = None
+    species = None 
     
     def get_key(self):
         return self.lab_number
@@ -173,7 +201,7 @@ class Isolate(GISMOH_Object):
         qry.mapkey_range=[q_start_string, q_end_string]
         qry.inclusive_end = True
 
-        keys = [i_res.docid for i_res in store.get_view('isolates_by_date_taken',query=qry, dev=True)]
+        keys = [i_res.docid for i_res in store.get_view('isolates_by_date_taken', query=qry, dev=True)]
         return store.fetch_objects(keys)
 
 
@@ -234,13 +262,20 @@ class Location(GISMOH_Object):
         qry = store.create_query()
         qry.mapkey_range=['', q_end_string] #we're using start date so it has to be before the end date.
         qry.inclusive_end=True
+        
         keys= []
+        objs= []
 
         for l_res in store.get_view('Location_by_start_date',query=qry, dev=True):
             if l_res.value is None or l_res.value > q_date_string :
                 keys.append(l_res.docid)
-
-        return store.fetch_objects(keys)
+                
+        if len(keys) > 0:
+            objs = store.fetch_objects(keys)
+        
+        print 'key : %s => objects : %s' % (len(keys), len(objs))
+        
+        return objs
 
 class Patient(GISMOH_Object):
     """
@@ -254,6 +289,10 @@ class Patient(GISMOH_Object):
     sex = None
     ## Patient's date of birth
     date_of_birth = None
+    ## Patient's home postcode
+    postcode = None
+    ## List of associated hospital Numbers
+    hospitalNumbers = []
     
     def __init__(self):
         pass
