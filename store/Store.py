@@ -1,105 +1,53 @@
 """
 GISMOH store
 """
-from couchbase import Couchbase, views
-
 import datetime
 from time import mktime
 
 TIME_FORMAT = '%Y-%m-%dT%H:%M:%S'
 
-## Connection to a database
-class CouchbaseStore:
-    db = None
-    
-    def __init__(self, bucket, password=None, host='127.0.0.1'):
-        self.db = Couchbase.connect(bucket=bucket,host=host, password=password)
-    
-    def save(self, obj):
-        self.db.set(u"%s:%s" % (obj.get_type() ,obj.get_key()), obj.get_dict())
-    
-    def fetch(self, cls, key):
-        #edit 
-        if type(key).__name__ == 'list' :
-            return self.db.get_multi(key)
-        else:
-            key = '%s:%s' % (cls.__name__, key)
-            return self.db.get(key)
-
-    def fetch_objects(self, keys):
-        get_class = lambda x: globals()[x]
-
-        _dicts = self.fetch(keys)
-
-        objs = []
-        for _dict in _dicts.values():
-
-            cls = get_class(_dict.value['type'])
-            obj = cls()
-            obj.from_dict(_dict.value)
-            objs.append(obj)
-
-        return objs
-
-      
-    def get_view(self, name, query = None, limit = None, dev = False):
-        
-        doc = 'gismoh'
-        
-        if dev:
-            doc = 'dev_gismoh'
-        _view = views.iterator.View(self.db, doc, name, query = query)
-        return _view
-    
-    def create_query(self):
-        return views.params.Query(full_set=True)
-    
-    def get_next_from(self, name, limit=None, dev = False, query = None):
-        
-        _view = self.get_view(name, query, limit, dev = True)
-        
-        for doc in _view:
-            yield doc
-
-    def get_from_view_by_key(self, name, key):
-        
-        _query = self.create_query()
-        _query.mapkey_single = key
-        _view = self.get_view(name, _query)
-        
-        return _view
-    
-class MSSQLStore:
-    db = None
+class Mapping:
+    _mapper = {}
     
     def __init__(self):
-        pass
-
-class SQLiteStore:
-    db = None
+        _mapper = {}
     
-    def __init__(self, dbname):
-        import sqlite3
-        self.db = sqlite3.connect('%s.db' % dbname)
-    
-    def get(self, cls, key):
-        pass
-    
-    def save(self, obj):
-        pass
-    
-    ## find and item of type cls where 
-    def find(self, cls, **kwargs):
-        pass
-
-    @staticmethod
-    def createInsertQuery(cls):
-        for fld in vars(cls):
-            pass
+    def object_to_db(self, _class, name):
+        tbl = self._mapper[_class]
+        return tbl['columns'][tbl['fields'].index(name)]
         
+    def db_to_object(self, _class, name):
+        tbl = self._mapper[_class]
+        return tbl['fields'][tbl['columns'].index(name)]
+    
+    def get_fields(self, _class):
+        return self._mapper[_class]['fields']
+    
+    def get_columns(self,_class):
+        return self._mapper[_class]['columns']
+    
+    def get_table_name(self, _class):
+        return self._mapper[_class]['table_name']
+    
+    def add_object(self, _class, table_name, mapping):
+        _map = {
+            'table_name' : table_name,
+            'fields' : [],
+            'columns' : []
+        }
+        
+        for key in mapping:
+            _map['fields'].append(key)
+            _map['columns'].append(mapping[key])
+            
+        self._mapper[_class] = _map
+          
 ## Base class describing functions shared by GISMOH objects   
 class GISMOH_Object(object):
 
+    def get_key_field(self):
+        raise NotImplementedError()
+    
     def get_key(self):
         raise NotImplementedError()
     
@@ -107,17 +55,20 @@ class GISMOH_Object(object):
         return type(self).__name__
     
     def get_dict(self):
-        obj_dict = self.__dict__
+        obj_dict = {}
         
-        for prop in obj_dict:
-            if type(obj_dict[prop]) == datetime.date:
-                obj_dict[prop] = obj_dict[prop].strftime('%Y-%m-%d')
-            elif type(obj_dict[prop]) == datetime.datetime:
-                obj_dict[prop] = obj_dict[prop].strftime(TIME_FORMAT)
-            elif type(obj_dict[prop]) == datetime.time:
-                 obj_dict[prop] = obj_dict[prop].strftime('%H:%M:%S')
-                 
-        obj_dict['type'] = self.get_type()
+        int_dict = self.__dict__
+        
+        for prop in int_dict:
+            if type(int_dict[prop]) == datetime.date:
+                obj_dict[prop] = int_dict[prop].strftime('%Y-%m-%d')
+            elif type(int_dict[prop]) == datetime.datetime:
+                obj_dict[prop] = int_dict[prop].strftime(TIME_FORMAT)
+            elif type(int_dict[prop]) == datetime.time:
+                 obj_dict[prop] = int_dict[prop].strftime('%H:%M:%S')
+            else:
+                obj_dict[prop] = int_dict[prop]
+        #obj_dict['type'] = self.get_type() -- couchbase specific, so should be handled in the couchbase store function
         
         return obj_dict
     
@@ -252,6 +203,9 @@ class Location(GISMOH_Object):
     def get_locations_between(store, from_date, to_date):
         """!
             get locations of patients at date_str
+            
+            TODO: Needs to be update to be store agnostic
+            
             @param store Store.Store: the store to get the data from
             @param qry_date datetime.datetime: the date and time at which we want to look
         """
@@ -273,8 +227,6 @@ class Location(GISMOH_Object):
         if len(keys) > 0:
             objs = store.fetch_objects(keys)
         
-        print 'key : %s => objects : %s' % (len(keys), len(objs))
-        
         return objs
 
 class Patient(GISMOH_Object):
@@ -295,12 +247,26 @@ class Patient(GISMOH_Object):
     hospitalNumbers = []
     
     def __init__(self):
-        pass
+        uniq_id = ''
+        nhs_number = ''
+        sex = ''
+        date_of_birth = None
+        postcode = None
+        hospitalNumbers = []
+    
+    def get_key_field(self):
+        return 'nhs_number'
     
     ### return the anonymised unique identifier of the Patient
     def get_key(self):
         return self.uniq_id
      
+    def from_dict(self, _dict, _map = None):
+        super(Patient, self).from_dict(_dict, _map)
+        
+        if type(self.date_of_birth) == unicode or type(self.date_of_birth) == str:
+            self.date_of_birth = datetime.datetime.strptime(self.date_of_birth, TIME_FORMAT)
+        
     ## Get NHS Number in a the format 000-000-0000
     @staticmethod
     def format_nhs_number(raw_number):

@@ -20,9 +20,14 @@ Inheritance diagram for store.\-Store.\-Location\-:\begin{figure}[H]
 \begin{DoxyCompactItemize}
 \item 
 def \hyperlink{classstore_1_1_store_1_1_location_a8f91f3015909f609043208b23811ce88}{get\-\_\-locations\-\_\-at}
+\begin{DoxyCompactList}\small\item\em get locations of patients at date\-\_\-str \end{DoxyCompactList}\item 
+def \hyperlink{classstore_1_1_store_1_1_location_aa917f5e17b22e33f624eeba242310c80}{get\-\_\-locations\-\_\-between}
 \begin{DoxyCompactList}\small\item\em get locations of patients at date\-\_\-str \end{DoxyCompactList}\end{DoxyCompactItemize}
 \subsection*{Static Public Attributes}
 \begin{DoxyCompactItemize}
+\item 
+\hypertarget{classstore_1_1_store_1_1_location_a0ba9dac1704c105d2d9f9dc598299bab}{{\bfseries uniq\-\_\-id} = None}\label{classstore_1_1_store_1_1_location_a0ba9dac1704c105d2d9f9dc598299bab}
+
 \item 
 \hypertarget{classstore_1_1_store_1_1_location_a4f7384df1dac7954a4b47ddb5f73e547}{{\bfseries ward} = None}\label{classstore_1_1_store_1_1_location_a4f7384df1dac7954a4b47ddb5f73e547}
 
@@ -56,7 +61,31 @@ get locations of patients at date\-\_\-str
 
 
 \begin{DoxyParams}{Parameters}
-{\em qry\-\_\-date} & \\
+{\em store} & Store.\-Store\-: the store to get the data from \\
+\hline
+{\em qry\-\_\-date} & datetime.\-datetime\-: the date and time at which we want to look \\
+\hline
+\end{DoxyParams}
+\hypertarget{classstore_1_1_store_1_1_location_aa917f5e17b22e33f624eeba242310c80}{\index{store\-::\-Store\-::\-Location@{store\-::\-Store\-::\-Location}!get\-\_\-locations\-\_\-between@{get\-\_\-locations\-\_\-between}}
+\index{get\-\_\-locations\-\_\-between@{get\-\_\-locations\-\_\-between}!store::Store::Location@{store\-::\-Store\-::\-Location}}
+\subsubsection[{get\-\_\-locations\-\_\-between}]{\setlength{\rightskip}{0pt plus 5cm}def store.\-Store.\-Location.\-get\-\_\-locations\-\_\-between (
+\begin{DoxyParamCaption}
+\item[{}]{store, }
+\item[{}]{from\-\_\-date, }
+\item[{}]{to\-\_\-date}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily [static]}}}\label{classstore_1_1_store_1_1_location_aa917f5e17b22e33f624eeba242310c80}
+
+
+get locations of patients at date\-\_\-str 
+
+T\-O\-D\-O\-: Needs to be update to be store agnostic
+
+
+\begin{DoxyParams}{Parameters}
+{\em store} & Store.\-Store\-: the store to get the data from \\
+\hline
+{\em qry\-\_\-date} & datetime.\-datetime\-: the date and time at which we want to look \\
 \hline
 \end{DoxyParams}
 

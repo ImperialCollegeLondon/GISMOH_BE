@@ -101,7 +101,7 @@ Inheritance diagram for store.Store.Location:</div>
  <div class="center">
   <img src="classstore_1_1_store_1_1_location.png" usemap="#store.Store.Location_map" alt=""/>
   <map id="store.Store.Location_map" name="store.Store.Location_map">
-<area href="classstore_1_1_store_1_1_g_i_s_m_o_h___object.html" alt="store.Store.GISMOH_Object" shape="rect" coords="0,56,172,80"/>
+<area href="classstore_1_1_store_1_1_g_i_s_m_o_h___object.html" title="Base class describing functions shared by GISMOH objects. " alt="store.Store.GISMOH_Object" shape="rect" coords="0,56,172,80"/>
 </map>
  </div></div>
 <table class="memberdecls">
@@ -135,9 +135,15 @@ Static Public Member Functions</h2></td></tr>
 <tr class="memitem:a8f91f3015909f609043208b23811ce88"><td class="memItemLeft" align="right" valign="top">def&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classstore_1_1_store_1_1_location.html#a8f91f3015909f609043208b23811ce88">get_locations_at</a></td></tr>
 <tr class="memdesc:a8f91f3015909f609043208b23811ce88"><td class="mdescLeft">&#160;</td><td class="mdescRight">get locations of patients at date_str  <a href="#a8f91f3015909f609043208b23811ce88">More...</a><br/></td></tr>
 <tr class="separator:a8f91f3015909f609043208b23811ce88"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aa917f5e17b22e33f624eeba242310c80"><td class="memItemLeft" align="right" valign="top">def&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classstore_1_1_store_1_1_location.html#aa917f5e17b22e33f624eeba242310c80">get_locations_between</a></td></tr>
+<tr class="memdesc:aa917f5e17b22e33f624eeba242310c80"><td class="mdescLeft">&#160;</td><td class="mdescRight">get locations of patients at date_str  <a href="#aa917f5e17b22e33f624eeba242310c80">More...</a><br/></td></tr>
+<tr class="separator:aa917f5e17b22e33f624eeba242310c80"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-static-attribs"></a>
 Static Public Attributes</h2></td></tr>
+<tr class="memitem:a0ba9dac1704c105d2d9f9dc598299bab"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a0ba9dac1704c105d2d9f9dc598299bab"></a>
+&#160;</td><td class="memItemRight" valign="bottom"><b>uniq_id</b> = None</td></tr>
+<tr class="separator:a0ba9dac1704c105d2d9f9dc598299bab"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a4f7384df1dac7954a4b47ddb5f73e547"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a4f7384df1dac7954a4b47ddb5f73e547"></a>
 &#160;</td><td class="memItemRight" valign="bottom"><b>ward</b> = None</td></tr>
 <tr class="separator:a4f7384df1dac7954a4b47ddb5f73e547"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -190,7 +196,58 @@ Static Public Attributes</h2></td></tr>
 <p>get locations of patients at date_str </p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">qry_date</td><td></td></tr>
+    <tr><td class="paramname">store</td><td>Store.Store: the store to get the data from </td></tr>
+    <tr><td class="paramname">qry_date</td><td>datetime.datetime: the date and time at which we want to look </td></tr>
+  </table>
+  </dd>
+</dl>
+
+</div>
+</div>
+<a class="anchor" id="aa917f5e17b22e33f624eeba242310c80"></a>
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">def store.Store.Location.get_locations_between </td>
+          <td>(</td>
+          <td class="paramtype">&#160;</td>
+          <td class="paramname"><em>store</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">&#160;</td>
+          <td class="paramname"><em>from_date</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">&#160;</td>
+          <td class="paramname"><em>to_date</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>get locations of patients at date_str </p>
+<p>TODO: Needs to be update to be store agnostic</p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">store</td><td>Store.Store: the store to get the data from </td></tr>
+    <tr><td class="paramname">qry_date</td><td>datetime.datetime: the date and time at which we want to look </td></tr>
   </table>
   </dd>
 </dl>
@@ -203,7 +260,7 @@ Static Public Attributes</h2></td></tr>
 </div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
-Generated on Mon Oct 21 2013 10:07:27 for GISMOH by &#160;<a href="http://www.doxygen.org/index.html">
+Generated on Wed Jan 29 2014 15:26:09 for GISMOH by &#160;<a href="http://www.doxygen.org/index.html">
 <img class="footer" src="doxygen.png" alt="doxygen"/>
 </a> 1.8.5
 </small></address>
