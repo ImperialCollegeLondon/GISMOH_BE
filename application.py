@@ -13,18 +13,21 @@ import datetime
 from sec.basic import require_basic_auth
 from sec import ldapauth
 
-from store import Store
-from modules.Antibiogram import Antibiogram
-from modules.Location import LocationInterface
 
 define('port', default=8800)
 define('output_file', default='profile.out')
 define('time_format', default='%Y-%m-%dT%H:%M:%S')
 
+from store.SQL import SQLiteStore
+from store import Store
+from modules.Antibiogram import Antibiogram
+from modules.Location import LocationInterface
+
 CB_HOST = '127.0.0.1'
 CB_BUCKET = 'GISMOH'
 CB_PASSWORD = 'gismoh2'
 
+SQLITE_FILE = 'gismoh-test.db'
 
 def get_arg_or_default(torn, argname, default):
     try:
@@ -32,6 +35,10 @@ def get_arg_or_default(torn, argname, default):
     except (tornado.web.MissingArgumentError):
         arg = default
     return arg
+
+def create_db_instance():
+    return SQLiteStore(SQLITE_FILE)
+    
 
 ##Index page handler
 #@require_basic_auth('GISMOH', ldapauth.auth_user_ldap)
@@ -51,7 +58,7 @@ class Antibiogram_Test(tornado.web.RequestHandler):
 
             isolate_id = float(get_arg_or_default(self,'isolate_id', -1))
             
-            _store = Store.Store(CB_BUCKET, CB_PASSWORD, CB_HOST)
+            _store = create_db_instance()
             #instance of the antibiogram module
             _abm = Antibiogram(_store)
             
@@ -93,7 +100,7 @@ class Locations(tornado.web.RequestHandler):
         from_date =  datetime.datetime.strptime(get_arg_or_default(self,'from', (datetime.datetime.now() - datetime.timedelta(days=7)).strftime(options.time_format)), options.time_format)
         to_date =  datetime.datetime.strptime(get_arg_or_default(self,'to', (datetime.datetime.now() - datetime.timedelta(days=7)).strftime(options.time_format)), options.time_format)
         
-        _store = Store.Store(CB_BUCKET, CB_PASSWORD, CB_HOST)
+        _store = create_db_instance()
         
         locs = Store.Location.get_locations_between(_store, from_date, to_date)
         loc_list = [loc.get_dict() for loc in sorted( locs, key = lambda obj : obj.patient_id)  if loc.ward == 'SCBU' ]
@@ -111,7 +118,7 @@ class Isolates(tornado.web.RequestHandler):
         from_date =  datetime.datetime.strptime(get_arg_or_default(self,'from', (datetime.datetime.now() - datetime.timedelta(days=7)).strftime(options.time_format)), options.time_format)
         to_date =  datetime.datetime.strptime(get_arg_or_default(self,'to', (datetime.datetime.now() - datetime.timedelta(days=7)).strftime(options.time_format)), options.time_format)
 
-        _store = Store.Store(CB_BUCKET, CB_PASSWORD, CB_HOST)
+        _store = create_db_instance()
         isos = Store.Isolate.get_isolates_taken_between(_store, from_date, to_date)
 
         iso_list = [iso.get_dict() for iso in isos]
@@ -133,7 +140,7 @@ class OverlapHandler(tornado.web.RequestHandler):
             out_obj = []
 
         else:
-            _store = Store.Store(CB_BUCKET, CB_PASSWORD, CB_HOST)
+            _store = create_db_instance()
             
             patient = Store.Patient.get_by_key(_store, patient_id)
             _loc_if = LocationInterface(_store)
@@ -154,7 +161,7 @@ class RiskAndPositiveHandler(tornado.web.RequestHandler):
     @tornado.web.asynchronous
     def get(self):
         self.set_header("Access-Control-Allow-Origin", "http://localhost:9000")
-        _store = Store.Store(CB_BUCKET, CB_PASSWORD, CB_HOST)
+        _store = create_db_instance()
         
         at_date = datetime.datetime.strptime(get_arg_or_default(self,'at_date', datetime.datetime.now().strftime(options.time_format)), options.time_format)
         

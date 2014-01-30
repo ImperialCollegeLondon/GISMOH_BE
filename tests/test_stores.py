@@ -2,7 +2,8 @@ from nose.tools import raises, with_setup
 import datetime
 import unittest
 
-from store.Store import SQLiteStore, Patient, Location, Mapping
+from store.SQL import SQLiteStore
+from store.Store import Patient, Location, Mapping
 
 DBFILENAME = 'gismoh_test'
 

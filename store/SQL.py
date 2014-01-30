@@ -1,12 +1,4 @@
-class MSSQLStore:
-    db = None
-    mapping = None
-    
-    def __init__(self, dbname, mapping = None):
-        import pyodbc
-        self.db = pyodbc.connect('DSN=%s&Trusted_Connection=True' % dbname)
-        self.mapping = mapping
-    
+class SQLStore:
     def get(self, cls, key):
         keyfield = cls().get_key_field() 
         qry = self.createSelectQuery(cls, keyfield)
@@ -64,3 +56,21 @@ class MSSQLStore:
             where_clause = ['%s = ?' % self.mapping.object_to_db(cls.__name__, a) for a in args]
         
         return 'SELECT %s FROM %s WHERE %s' % (','.join(fields), table_name, ' and '.join(where_clause))
+    
+class SQLiteStore (SQLStore):
+    db = None
+    mapping = None
+    
+    def __init__(self, dbname, mapping = None):
+        import sqlite3
+        self.db = sqlite3.connect('%s.db' % dbname)
+        self.mapping = mapping
+        
+class MSSQLStore (SQLStore):
+    db = None
+    mapping = None
+    
+    def __init__(self, dbname, mapping = None):
+        import pyodbc
+        self.db = pyodbc.connect('DSN=%s&Trusted_Connection=True' % dbname)
+        self.mapping = mapping

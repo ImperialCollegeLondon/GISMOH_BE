@@ -210,22 +210,24 @@ class Location(GISMOH_Object):
             @param qry_date datetime.datetime: the date and time at which we want to look
         """
 
-        q_date_string = from_date.strftime(TIME_FORMAT)
-        q_end_string = to_date.strftime(TIME_FORMAT)
+        #q_date_string = from_date.strftime(TIME_FORMAT)
+        #q_end_string = to_date.strftime(TIME_FORMAT)
 
-        qry = store.create_query()
-        qry.mapkey_range=['', q_end_string] #we're using start date so it has to be before the end date.
-        qry.inclusive_end=True
+        #qry = store.create_query()
+        #qry.mapkey_range=['', q_end_string] #we're using start date so it has to be before the end date.
+        #qry.inclusive_end=True
         
-        keys= []
-        objs= []
+        #keys= []
+        #objs= []
 
-        for l_res in store.get_view('Location_by_start_date',query=qry, dev=True):
-            if l_res.value is None or l_res.value > q_date_string :
-                keys.append(l_res.docid)
+        #for l_res in store.get_view('Location_by_start_date',query=qry, dev=True):
+            #if l_res.value is None or l_res.value > q_date_string :
+                #keys.append(l_res.docid)
                 
-        if len(keys) > 0:
-            objs = store.fetch_objects(keys)
+        #if len(keys) > 0:
+            #objs = store.fetch_objects(keys)
+        
+        store.get(Location, { 'op' : 'gt', 'value' : from_date }, { 'op' : 'lt', 'value' : to_date })
         
         return objs
 
