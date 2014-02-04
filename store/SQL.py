@@ -48,7 +48,7 @@ class SQLStore:
             table_name = cls.__name__
             fields = [fld for fld in cls.__dict__ if type(cls.__dict__[fld]).__name__ != 'function' and type(cls.__dict__[fld]).__name__ != 'staticmethod' and fld[0:2] != '__']
         
-            where_clause = ['%s = ?' % a for a in args]
+            where_clause = [self.get_where_clause(a) for a in args]
             
         else: # if there is a mapping
             table_name = self.mapping.get_table_name(cls.__name__)
@@ -57,6 +57,12 @@ class SQLStore:
         
         return 'SELECT %s FROM %s WHERE %s' % (','.join(fields), table_name, ' and '.join(where_clause))
     
+    def get_where_clause(self, arg):
+        if type(arg) == str or type(arg) == unicode:
+            return u'%s = ?' % (self.mapping.object_to_db(arg) if self.mapping is not None else arg)
+        else:
+            return u'%s %s %s' %  (self.mapping.object_to_db(arg['field']) if self.mapping is not None else arg['field'], arg['op'], arg['value'])
+
 class SQLiteStore (SQLStore):
     db = None
     mapping = None

@@ -12,6 +12,16 @@ class sqlite_test(unittest.TestCase):
         st = SQLiteStore(DBFILENAME)
         assert st is not None
         
+    def test_get_arg(self):
+        st = SQLiteStore(DBFILENAME)
+
+        clause = st.get_where_clause('x')
+
+        print clause
+
+        assert clause== 'x = ?'
+
+
     def test_mapper(self):
         _map = Mapping()
         

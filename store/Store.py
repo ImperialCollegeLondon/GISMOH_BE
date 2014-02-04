@@ -227,7 +227,7 @@ class Location(GISMOH_Object):
         #if len(keys) > 0:
             #objs = store.fetch_objects(keys)
         
-        store.get(Location, { 'op' : 'gt', 'value' : from_date }, { 'op' : 'lt', 'value' : to_date })
+        store.get(Location, { 'field' : 'end_date', 'op' : '>', 'value' : from_date }, { 'field' : 'start_date', 'op' : '<', 'value' : to_date })
         
         return objs
 
