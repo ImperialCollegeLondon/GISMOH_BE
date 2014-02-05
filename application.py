@@ -52,6 +52,15 @@ def create_db_instance():
         'postcode' : 'postcode'
     })
 
+    _map.add_object('Location', 'PatientLocation',{
+        'uniq_id' : 'pl_id',
+        'ward' : 'ward_id',
+        'specialty': 'speciality',
+        'arrived' : 'date_arrived',
+        'left' : 'date_left',
+        'patient_id' : 'patient_id'
+    })
+
     return cls(options.db_constr, _map)
     
 
@@ -78,17 +87,16 @@ class Antibiogram_Test(tornado.web.RequestHandler):
             _abm = Antibiogram(_store)
             
             if isolate_id == -1 :
-                _abs = _store.get_from_view_by_key('Results', patient_id)
+                ab_list = _store.find(Store.Result, { 'field' : 'patient_id', 'op' : '=', 'value': patient_id })
     
     
                 f_list = []
                 p_list = []
     
-                ab_list = _store.fetch(list(set([ unicode(obj.docid) for obj in _abs ])))
+               # ab_list = _store.fetch(list(set([ unicode(obj.docid) for obj in _abs ])))
             else:
-                ab_list = [Store.Result.get_by_key(isolate_id)]
-        
-            print ab_list
+                ab_list = [_store.get(Store.Result, isolate_id)]
+
         
             for abx in ab_list.values() :
                 for ab in _abm.get_nearest(abx.value, None, 11.5/12.0, gap_penalty = 0.25):
@@ -214,8 +222,7 @@ class RiskAndPositiveHandler(tornado.web.RequestHandler):
         self.add_header('Content-type', 'application/json')
         self.finish(json.dumps([pat for pat in sorted(patients.values(), key = lambda obj : obj['patient_id']) if pat.has_key('ab') ]))
 
-
-if __name__ == "__main__":
+def init_app():
     parse_config_file('./GISMOH.conf')
     parse_command_line(final=True)
 
@@ -236,6 +243,11 @@ if __name__ == "__main__":
         (r'/api/risk_patients', RiskAndPositiveHandler),
         (r"/", MainHandler)
     ], **settings)
+
+    return application
+
+if __name__ == "__main__":
+    application = init_app()
 
     application.listen(options.port)
     tornado.ioloop.IOLoop.instance().start()
