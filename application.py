@@ -3,7 +3,7 @@
 import tornado.ioloop
 import tornado.web
 from tornado import gen
-from tornado.options import parse_command_line, define, options
+from tornado.options import parse_command_line, parse_config_file, define, options
 
 import json
 from os import path
@@ -13,21 +13,19 @@ import datetime
 from sec.basic import require_basic_auth
 from sec import ldapauth
 
-
-define('port', default=8800)
-define('output_file', default='profile.out')
-define('time_format', default='%Y-%m-%dT%H:%M:%S')
-
-from store.SQL import SQLiteStore
+from store.SQL import SQLiteStore, MSSQLStore
+from store.Couchbase import CouchbaseStore
 from store import Store
 from modules.Antibiogram import Antibiogram
 from modules.Location import LocationInterface
+from modules.Logging import *
 
-CB_HOST = '127.0.0.1'
-CB_BUCKET = 'GISMOH'
-CB_PASSWORD = 'gismoh2'
-
-SQLITE_FILE = 'gismoh-test.db'
+define('port', default='8800')
+define('debug', default=False)
+define('db_type')
+define('db_constr')
+define('time_format', default='%Y-%m-%dT%H:%M:%S')
+define('profile_out', default='profile.out')
 
 def get_arg_or_default(torn, argname, default):
     try:
@@ -37,7 +35,24 @@ def get_arg_or_default(torn, argname, default):
     return arg
 
 def create_db_instance():
-    return SQLiteStore(SQLITE_FILE)
+    dbs = {
+        'SQLITE' : SQLiteStore,
+        'MSSQL' : MSSQLStore,
+        'CB' : CouchbaseStore
+    }
+    cls = dbs[options.db_type]
+
+    _map = Store.Mapping()
+
+    _map.add_object('Patient', 'Patient', {
+        'uniq_id': 'patient_id',
+        'nhs_number' : 'nhsNumber',
+        'sex' : 'sex',
+        'date_of_birth' : 'dob',
+        'postcode' : 'postcode'
+    })
+
+    return cls(options.db_constr, _map)
     
 
 ##Index page handler
@@ -132,17 +147,17 @@ class OverlapHandler(tornado.web.RequestHandler):
         self.set_header("Access-Control-Allow-Origin", "http://localhost:9000")
         self.add_header('Content-type', 'application/json')
         
-        patient_id = float(get_arg_or_default(self,'patient_id', 0.0))
+        patient_id = get_arg_or_default(self,'patient_id', False)
         date_from = datetime.datetime.strptime(get_arg_or_default(self,'from', (datetime.datetime.now() - datetime.timedelta(days=7)).strftime(options.time_format)),options.time_format)
         date_to = datetime.datetime.strptime(get_arg_or_default(self,'to', datetime.datetime.now().strftime(options.time_format)), options.time_format)
         
-        if patient_id == 0.0 :
+        if patient_id == False :
             out_obj = []
 
         else:
             _store = create_db_instance()
             
-            patient = Store.Patient.get_by_key(_store, patient_id)
+            patient = _store.get(Store.Patient, patient_id)
             _loc_if = LocationInterface(_store)
         
             olaps = _loc_if.get_overlaps_with_patient(patient)
@@ -199,22 +214,28 @@ class RiskAndPositiveHandler(tornado.web.RequestHandler):
         self.add_header('Content-type', 'application/json')
         self.finish(json.dumps([pat for pat in sorted(patients.values(), key = lambda obj : obj['patient_id']) if pat.has_key('ab') ]))
 
-settings = dict(
-   template_path = path.join(path.dirname(__file__), "templates"),
-   static_path = path.join(path.dirname(__file__), "static"),
-   debug = True
-)
-
-application = tornado.web.Application([
-    (r'/api/antibiogram', Antibiogram_Test),
-    (r'/api/overlaps', OverlapHandler),
-    (r'/api/locations', Locations),
-    (r'/api/isolates', Isolates),
-    (r'/api/risk_patients', RiskAndPositiveHandler),
-    (r"/", MainHandler)
-], **settings)
-
 
 if __name__ == "__main__":
+    parse_config_file('./GISMOH.conf')
+    parse_command_line(final=True)
+
+    logger = get_logger(__name__)
+    add_file_handler(logger)
+
+    settings = dict(
+       template_path = path.join(path.dirname(__file__), "templates"),
+       static_path = path.join(path.dirname(__file__), "static"),
+       debug = options.debug
+    )
+
+    application = tornado.web.Application([
+        (r'/api/antibiogram', Antibiogram_Test),
+        (r'/api/overlaps', OverlapHandler),
+        (r'/api/locations', Locations),
+        (r'/api/isolates', Isolates),
+        (r'/api/risk_patients', RiskAndPositiveHandler),
+        (r"/", MainHandler)
+    ], **settings)
+
     application.listen(options.port)
     tornado.ioloop.IOLoop.instance().start()
