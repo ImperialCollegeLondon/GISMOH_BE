@@ -1,10 +1,9 @@
-class SQLStore:
+class SQLStore(object):
     def get(self, cls, key):
         keyfield = cls().get_key_field() 
         qry = self.createSelectQuery(cls, keyfield)
         
         obj = False
-        print qry
 
         for row in self.db.execute(qry, [key]) :
 
@@ -12,19 +11,45 @@ class SQLStore:
             obj.from_dict(dict(zip(self.mapping.get_fields(cls.__name__), list(row))))
 
         if not obj:
-            raise NotFoundException()
+            return None
 
         return obj
     
+    def get_by(self, cls, fld, val):
+        qry = self.createSelectQuery(cls, fld)
+        
+        objs = []
+
+        for row in self.db.execute(qry, [val]) :
+
+            obj = cls()
+            obj.from_dict(dict(zip(self.mapping.get_fields(cls.__name__), list(row))))
+            objs.append(obj)
+
+        return objs
+    
     def save(self, obj):
+        import json
         qry = self.createInsertQuery(obj)
-        self.db.execute(qry, obj.get_dict().values())
+        
+        cur = self.db.execute(qry, [obj.get_dict(obj_strings=True).values()])
         self.db.commit()
+        return cur
+    
+    def update(self, obj):
+        qry = self.createUpdateQuery(obj)
+        
+        d = obj.get_dict(obj_strings=True)
+        d.pop(obj.get_key_field(), None)
+        
+        cur = self.db.execute(qry,  d.values() + [obj.get_key()])
+        self.db.commit()
+        return cur
         
     
     ## find and item of type cls where 
     def find(self, cls, *clauses):
-        print clauses
+        
         qry = self.createSelectQuery(cls, *clauses)
 
         objs = []
@@ -40,7 +65,10 @@ class SQLStore:
     def createInsertQuery(self, obj):
         if self.mapping is None:
             table_name = type(obj).__name__
-            fields = [fld for fld in obj.get_dict()]
+            
+            _dict = obj.get_dict()
+            
+            fields = [fld for fld in _dict if _dict[fld] is not None]
             qmarks = ['?' for fld in fields]
         else:
             cls = type(obj)
@@ -51,13 +79,16 @@ class SQLStore:
         return 'INSERT INTO %s (%s) VALUES (%s)' % (table_name, ','.join(fields), ','.join(qmarks))
     
     def createUpdateQuery(self, obj):
+        d = obj.get_dict()
+        d.pop(obj.get_key_field(), None)
+        
         if self.mapping is None:
             table_name = type(obj).__name__
-            fields = ['%s = ?' % fld for fld in obj.get_dict()]
+            fields = ['%s = ?' % fld for fld in d]
         else:
             cls = type(obj)
             table_name = self.mapping.get_table_name(cls.__name__)
-            fields = ['%s = ?' % self.mapping.object_to_db(cls.__name__, fld) for fld in obj.get_dict()]
+            fields = ['%s = ?' % self.mapping.object_to_db(cls.__name__, fld) for fld in d]
             
         return 'Update %s SET %s WHERE %s = ?' % (table_name, ','.join(fields), obj.get_key_field())
     
@@ -91,6 +122,14 @@ class SQLiteStore (SQLStore):
         self.db = sqlite3.connect('%s.db' % dbname)
         self.mapping = mapping
         
+    def save(self, obj):
+        cur = super(SQLiteStore, self).save(obj)
+        
+        return cur.lastrowid
+    
+    def executescript(self, sql):
+        return self.db.executescript(sql)
+        
 class MSSQLStore (SQLStore):
     db = None
     mapping = None
@@ -99,6 +138,15 @@ class MSSQLStore (SQLStore):
         import pyodbc
         self.db = pyodbc.connect('DSN=%s&Trusted_Connection=True' % dbname)
         self.mapping = mapping
+        
+    def save(self, obj):
+        super(MSSQLStore, self).save(obj)
+        
+        _id = None
+        for row in self.db.execute("SELECT @@IDENTITY as id"):
+            _id = row['id']
+            
+        return _id
 
 class NotFoundException(Exception):
     def __init__(self, msg = "Item not found"):

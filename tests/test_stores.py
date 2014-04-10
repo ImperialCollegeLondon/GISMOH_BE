@@ -12,6 +12,9 @@ class sqlite_test(unittest.TestCase):
         st = SQLiteStore(DBFILENAME)
         assert st is not None
         
+        with open('Addies.sqlite','r') as _f:
+            st.executescript(_f.read())
+        
     def test_get_arg(self):
         st = SQLiteStore(DBFILENAME)
 
@@ -57,11 +60,10 @@ class sqlite_test(unittest.TestCase):
         except Exception:
             assert True
         
-        pat2 = st.get(Patient, '111-111-1111')
-        for fld in pat.__dict__:
-            print fld
-            print type(getattr(pat,fld)), type(getattr(pat2, fld))
-            assert getattr(pat,fld) == getattr(pat2, fld)
+        pat2 = Patient.get_by(st, 'nhs_number', '111-111-1111')[0]
+        for fld in pat.__dict__ :
+            if fld != 'uniq_id':
+                assert getattr(pat,fld) == getattr(pat2, fld)
 
     def test_find(self):
         _map = Mapping()

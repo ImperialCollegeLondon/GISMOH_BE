@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-requirements = ['tornado', 'couchbase']
+requirements = ['tornado']
 
 setup(
     name = 'GISMOH',

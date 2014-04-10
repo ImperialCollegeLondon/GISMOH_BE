@@ -10,22 +10,21 @@ from os import path
 import uuid
 import datetime
 
-from sec.basic import require_basic_auth
-from sec import ldapauth
-
 from store.SQL import SQLiteStore, MSSQLStore
-from store.Couchbase import CouchbaseStore
 from store import Store
-from modules.Antibiogram import Antibiogram
+from modules.Antibiogram import Antibiogram, AntibiogramInterface
 from modules.Location import LocationInterface
 from modules.Logging import *
 
+#define configuration options for GISMOH
 define('port', default='8800')
 define('debug', default=False)
 define('db_type')
 define('db_constr')
 define('time_format', default='%Y-%m-%dT%H:%M:%S')
 define('profile_out', default='profile.out')
+
+#make this a class!
 
 def get_arg_or_default(torn, argname, default):
     try:
@@ -34,13 +33,12 @@ def get_arg_or_default(torn, argname, default):
         arg = default
     return arg
 
-def create_db_instance():
+def create_db_instance(db_type, con_str):
     dbs = {
         'SQLITE' : SQLiteStore,
-        'MSSQL' : MSSQLStore,
-        'CB' : CouchbaseStore
+        'MSSQL' : MSSQLStore
     }
-    cls = dbs[options.db_type]
+    cls = dbs[db_type]
 
     _map = Store.Mapping()
 
@@ -50,6 +48,12 @@ def create_db_instance():
         'sex' : 'sex',
         'date_of_birth' : 'dob',
         'postcode' : 'postcode'
+    })
+    
+    _map.add_object('PatientHospitalNumber', 'PatientHospitalNumber', {
+        'patient_id': 'patient_id',
+        'hospital' : 'hospital_id',
+        'hospital_number' : 'hospitalNumber'
     })
 
     _map.add_object('Location', 'PatientLocation',{
@@ -61,7 +65,38 @@ def create_db_instance():
         'patient_id' : 'patient_id'
     })
 
-    return cls(options.db_constr, _map)
+    _map.add_object('Isolate', 'Isolate',{
+        'lab_number' : 'isolate_id',
+        'patient_id' : 'patient_id',
+        'date_taken' : 'taken',
+        'organism' : 'organism',
+        'location': 'location',
+        'sample_site' : 'sample_site',
+        'meta_data' : 'meta_data'
+    })
+    
+    _map.add_object('Antibiogram', 'Antibiogram', {
+        'instance_id' : 'instance_id',
+        'isolate_id' : 'isolate_id',
+        'organism' : 'organism',
+        'sir_results' : 'sir_results',
+        'sir_result_identifier' : 'sir_results_identifier',
+        'zone_size_results' : 'zone_size_results',
+        'is_resistant' : 'resistant',
+        'print_number' : 'print_number',
+        'date_tested' : 'test_date',
+    })   
+    
+    _map.add_object('Ward', 'Ward', {
+        'uniq_id' : 'ward_id',
+        'shortName': 'shortName',
+        'fullName' : 'fullName',
+        'n_beds' : 'n_beds',
+        'hospital_id' : 'hospital_id',
+        'include' : 'include'
+    })
+    
+    return cls(con_str, _map)
     
 
 ##Index page handler
@@ -70,46 +105,59 @@ class MainHandler(tornado.web.RequestHandler):
     def get(self):
         self.render('main.html')#,test_val=rowout)
         
+## Handle Antibiogram data requests
+#   For a given isolate of a given patient, return all Antibiogram links before a certain date.
+#   Uses the Antibiogram module to determine isolate similarity
+#
+# Args:
+#   patient_id : The GISMOH Internal ID of the paitent (as opposed to NHS Number)
+#   at_date : The current date or date we are interested in
+#   isolate : The Isolate we want to base our investigation on
 #@require_basic_auth('GISMOH', ldapauth.auth_user_ldap)
-class Antibiogram_Test(tornado.web.RequestHandler):
+class Antibiogram(tornado.web.RequestHandler):
     @tornado.web.asynchronous
     def get(self):
         self.set_header("Access-Control-Allow-Origin", "http://localhost:9000")
         
-        try:
-            patient_id = float(get_arg_or_default(self,'patient_id', 1))
-            at_date = datetime.datetime.strptime(get_arg_or_default(self,'at_date', datetime.datetime.now().strftime(options.time_format)), options.time_format)
-
-            isolate_id = float(get_arg_or_default(self,'isolate_id', -1))
-            
-            _store = create_db_instance()
-            #instance of the antibiogram module
-            _abm = Antibiogram(_store)
-            
-            if isolate_id == -1 :
-                ab_list = _store.find(Store.Result, { 'field' : 'patient_id', 'op' : '=', 'value': patient_id })
-    
-    
-                f_list = []
-                p_list = []
-    
-               # ab_list = _store.fetch(list(set([ unicode(obj.docid) for obj in _abs ])))
-            else:
-                ab_list = [_store.get(Store.Result, isolate_id)]
-
         
-            for abx in ab_list.values() :
-                for ab in _abm.get_nearest(abx.value, None, 11.5/12.0, gap_penalty = 0.25):
-                    if not p_list.__contains__(ab['Result']['patient_id']) and ab['Result']['test_date'] <= at_date.strftime(options.time_format) and ab['Result']['patient_id'] != patient_id:
+        patient_id = float(get_arg_or_default(self,'patient_id', 1))
+        at_date = datetime.datetime.strptime(get_arg_or_default(self,'at_date', datetime.datetime.now().strftime(options.time_format)), options.time_format)
+
+        isolate_id = get_arg_or_default(self,'isolate_id', -1)
+
+        _store = create_db_instance(options.db_type, options.db_constr)
+        #instance of the antibiogram module
+        _abm = AntibiogramInterface(_store)
+    
+        p_list = []
+        f_list= []
+        if isolate_id != -1 :
+            ref_iso = Store.Isolate.get(_store, isolate_id)    
+            ab_list = Antibiogram.get_by(_store, 'isolate_id', isolate_id)
+        
+            for abx in ab_list :
+                for ab in _abm.get_nearest(abx, None, 11.5/12.0, gap_penalty = 0.25):
+                    isolate = Store.Isolate.get(_store, ab['Antibiogram'].isolate_id)
+                    patient = Store.Patient.get(_store, isolate.patient_id)
+                    
+                    patnum = patient.nhs_number
+                    
+                    if patnum is None or patnum == '':
+                        patnums = Store.PatientHospitalNumber.get_by(_store, 'patient_id', patient.uniq_id)
+                        
+                        if len(patnums) > 0:
+                            patnum = patnums[0].hospital_number
+                    
+                    if isolate.patient_id not in p_list and isolate.date_taken <= at_date and isolate.patient_id != ref_iso.patient_id:
+                        i_dic = isolate.get_dict(True)
+                        i_dic['patient_number'] = patnum
+                        
+                        ab['Antibiogram'] = ab['Antibiogram'].get_dict(True)
+                        ab['Isolate'] = i_dic
                         f_list.append(ab)
-                        p_list.append(ab['Result']['patient_id'])
+                        p_list.append(isolate.patient_id)
 
-
-            self.add_header('Content-type', 'application/json')
-        except:
-          f_list = []
-          print 'error'
-
+        self.add_header('Content-type', 'application/json')
         self.finish(json.dumps(f_list))
 
 #@require_basic_auth('GISMOH', ldapauth.auth_user_ldap)
@@ -123,11 +171,24 @@ class Locations(tornado.web.RequestHandler):
         from_date =  datetime.datetime.strptime(get_arg_or_default(self,'from', (datetime.datetime.now() - datetime.timedelta(days=7)).strftime(options.time_format)), options.time_format)
         to_date =  datetime.datetime.strptime(get_arg_or_default(self,'to', (datetime.datetime.now() - datetime.timedelta(days=7)).strftime(options.time_format)), options.time_format)
         
-        _store = create_db_instance()
+        _store = create_db_instance(options.db_type, options.db_constr)
+        
+        loc_list= []
         
         locs = Store.Location.get_locations_between(_store, from_date, to_date)
-        loc_list = [loc.get_dict() for loc in sorted( locs, key = lambda obj : obj.patient_id)  if loc.ward == 'SCBU' ]
-        
+        for loc in locs:
+            pnum = Store.Patient.get(_store, loc.patient_id).nhs_number
+            if pnum is None or pnum == '':
+                pns = Store.PatientHospitalNumber.get_by(_store, 'patient_id', loc.patient_id)
+                pnum =pns[0].hospital_number
+            
+            ld = loc.get_dict(True)
+            ld['patient_number'] = pnum
+            ld['ward_name'] = Store.Ward.get(_store, loc.ward).shortName
+            
+            loc_list.append(ld)
+            
+     
         self.finish(json.dumps(loc_list))
 
 #@require_basic_auth('GISMOH', ldapauth.auth_user_ldap)
@@ -141,12 +202,14 @@ class Isolates(tornado.web.RequestHandler):
         from_date =  datetime.datetime.strptime(get_arg_or_default(self,'from', (datetime.datetime.now() - datetime.timedelta(days=7)).strftime(options.time_format)), options.time_format)
         to_date =  datetime.datetime.strptime(get_arg_or_default(self,'to', (datetime.datetime.now() - datetime.timedelta(days=7)).strftime(options.time_format)), options.time_format)
 
-        _store = create_db_instance()
+        _store = create_db_instance(options.db_type, options.db_constr)
         isos = Store.Isolate.get_isolates_taken_between(_store, from_date, to_date)
 
-        iso_list = [iso.get_dict() for iso in isos]
-
-        self.finish(json.dumps(iso_list))
+        for iso in isos:
+            iso.result = [ab.get_dict(True) for ab in Antibiogram.get_by(_store, 'isolate_id', iso.lab_number) ]
+            
+        
+        self.finish(json.dumps([i.get_dict(True) for i in isos]))
 
 #@require_basic_auth('GISMOH', ldapauth.auth_user_ldap)
 class OverlapHandler(tornado.web.RequestHandler):
@@ -163,7 +226,7 @@ class OverlapHandler(tornado.web.RequestHandler):
             out_obj = []
 
         else:
-            _store = create_db_instance()
+            _store = create_db_instance(options.db_type, options.db_constr)
             
             patient = _store.get(Store.Patient, patient_id)
             _loc_if = LocationInterface(_store)
@@ -172,7 +235,7 @@ class OverlapHandler(tornado.web.RequestHandler):
             olap_list = []
             
             for k in olaps:
-                olap_list += [o.get_dict() for o in olaps[k]]
+                olap_list += [o.get_dict(True) for o in olaps[k]]
                 
             out_obj = sorted(olap_list, key= lambda obj : obj['patient_id'])
 
@@ -184,40 +247,50 @@ class RiskAndPositiveHandler(tornado.web.RequestHandler):
     @tornado.web.asynchronous
     def get(self):
         self.set_header("Access-Control-Allow-Origin", "http://localhost:9000")
-        _store = create_db_instance()
+        _store = create_db_instance(options.db_type, options.db_constr)
+        
+        interval = get_arg_or_default(self, 'days' , 1)
         
         at_date = datetime.datetime.strptime(get_arg_or_default(self,'at_date', datetime.datetime.now().strftime(options.time_format)), options.time_format)
+        cutoff_date = at_date - datetime.timedelta(days = interval)
         
         patients = {}
         
         for loc in Store.Location.get_locations_between(_store, at_date, at_date - datetime.timedelta(days=1)):
-            pat = { 'patient_id' : loc.patient_id, 'location' : loc.get_dict(), 'admission' : Store.Admission.get_by_key(_store, loc.admission_id).get_dict() }
+            patient = Store.Patient.get(_store, loc.patient_id)
+           
+            if patient.nhs_number is None or patient.nhs_number == '':
+                pns = Store.PatientHospitalNumber.get_by(_store, 'patient_id', loc.patient_id)
+                if len(pns) > 0:
+                    pnum = pns[0].hospital_number
+                else:
+                    pnum = 'No ID'
+            else:
+                pnum = patient.nhs_number
+            
+            loc.ward_name = Store.Ward.get(_store, loc.ward).shortName
+            
+            pat = { 'patient_id' : loc.patient_id, 'patient_number' : pnum, 'location' : loc.get_dict(True)}
             patients[str(loc.patient_id)] = pat
             
-        qry = _store.create_query()
-        res = _store.get_view('Results', query=qry)
+        if len(patients.keys()) > 0:
+            isolates = _store.find(Store.Isolate, { 'field' : 'date_taken', 'op' : '>', 'value' : cutoff_date })
+        else :
+            isolates = []
 
-        result_keys = [ obj.docid for obj in res ]
-        results = _store.fetch_objects(result_keys)
-
-        iso_keys = [ u'Isolate:%s' % obj.isolate_id for obj in results ]
-        _isolates = _store.fetch_objects(iso_keys)
-        isolates = {}
-        for _iso in _isolates:
-            isolates[_iso.lab_number] = _iso
-
-        for res in results:
-         
-            iso = isolates[res.isolate_id]
+        for iso in isolates:
+            results = Antibiogram.get_by(_store, 'isolate_id', iso.lab_number)
+            
+            res = results[0]
             
             #filter out future isolates if we're using the replay functionality
-            if iso.date_taken > at_date or not res.result:
+            if iso.date_taken > at_date:
                 continue
             
             if patients.has_key(str(iso.patient_id)):
                 str_taken = iso.date_taken.strftime(options.time_format)
-                patients[str(iso.patient_id)]['ab'] = res.get_dict()
-                patients[str(iso.patient_id)]['type'] = 'positive' if str_taken > patients[str(iso.patient_id)]['admission']['start_date'] and str_taken < patients[str(iso.patient_id)]['admission']['end_date'] else 'risk'
+                patients[str(iso.patient_id)]['ab'] = res.get_dict(True)
+                patients[str(iso.patient_id)]['type'] = 'positive' if res.is_resistant else 'risk'
                 
         self.add_header('Content-type', 'application/json')
         self.finish(json.dumps([pat for pat in sorted(patients.values(), key = lambda obj : obj['patient_id']) if pat.has_key('ab') ]))
@@ -226,9 +299,6 @@ def init_app():
     parse_config_file('./GISMOH.conf')
     parse_command_line(final=True)
 
-    logger = get_logger(__name__)
-    add_file_handler(logger)
-
     settings = dict(
        template_path = path.join(path.dirname(__file__), "templates"),
        static_path = path.join(path.dirname(__file__), "static"),
@@ -236,7 +306,7 @@ def init_app():
     )
 
     application = tornado.web.Application([
-        (r'/api/antibiogram', Antibiogram_Test),
+        (r'/api/antibiogram', Antibiogram),
         (r'/api/overlaps', OverlapHandler),
         (r'/api/locations', Locations),
         (r'/api/isolates', Isolates),
@@ -248,6 +318,13 @@ def init_app():
 
 if __name__ == "__main__":
     application = init_app()
-
+    
+    logger = get_logger(__name__)
+    add_file_handler(logger)
+    
     application.listen(options.port)
     tornado.ioloop.IOLoop.instance().start()
+    
+    print "hello!"
+    
+    

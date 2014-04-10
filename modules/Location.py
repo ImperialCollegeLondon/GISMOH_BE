@@ -9,6 +9,7 @@ class LocationInterface(object):
     # @param location Store.Location:     
     def get_overlaps_with_location(self, location):
         a = location
+        overlaps = []
         
         b_list = self.store.find(Store.Location, {'field' : 'ward', 'op' : '=', 'value' : a.ward})
 
@@ -20,7 +21,7 @@ class LocationInterface(object):
     
     def get_overlaps_with_patient(self, patient, date_from = None, date_to = None):
         patient_locations = self.store.find(Store.Location, {'field' : 'patient_id', 'op' : '=', 'value' : patient.uniq_id})
-        overlaps = []
+        overlaps = {}
         
         for loc in patient_locations:
             _lst = self.get_overlaps_with_location(loc)
