@@ -1,5 +1,3 @@
-
-#from plop.collector import Collector #for prodiling the app
 import tornado.ioloop
 import tornado.web
 from tornado import gen
