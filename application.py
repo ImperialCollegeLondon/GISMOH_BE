@@ -115,7 +115,7 @@ class MainHandler(tornado.web.RequestHandler):
 #   at_date : The current date or date we are interested in
 #   isolate : The Isolate we want to base our investigation on
 #@require_basic_auth('GISMOH', ldapauth.auth_user_ldap)
-class Antibiogram(tornado.web.RequestHandler):
+class AntibiogramHandler(tornado.web.RequestHandler):
     @tornado.web.asynchronous
     def get(self):
         self.set_header("Access-Control-Allow-Origin", "http://localhost:9000")
@@ -132,8 +132,13 @@ class Antibiogram(tornado.web.RequestHandler):
 
         p_list = []
         f_list= []
+
+        # Isolate ID can be 0 so -1 is the "no isolate" value
         if isolate_id != -1 :
+            #ref_iso : reference isolate : the isolate we are comparing to.
             ref_iso = Store.Isolate.get(_store, isolate_id)
+
+            # get all antibiograms for this isolate.
             ab_list = Antibiogram.get_by(_store, 'isolate_id', isolate_id)
 
             for abx in ab_list :
@@ -182,7 +187,7 @@ class Locations(tornado.web.RequestHandler):
             pnum = Store.Patient.get(_store, loc.patient_id).nhs_number
             if pnum is None or pnum == '':
                 pns = Store.PatientHospitalNumber.get_by(_store, 'patient_id', loc.patient_id)
-                pnum = spns[0].hospital_number
+                pnum = pns[0].hospital_number
 
             ld = loc.get_dict(True)
             ld['patient_number'] = pnum
@@ -323,7 +328,7 @@ def init_app():
     )
 
     application = tornado.web.Application([
-        (r'/api/antibiogram', Antibiogram),
+        (r'/api/antibiogram', AntibiogramHandler),
         (r'/api/overlaps', OverlapHandler),
         (r'/api/locations', Locations),
         (r'/api/isolates', Isolates),
@@ -341,5 +346,3 @@ if __name__ == "__main__":
 
     application.listen(options.port)
     tornado.ioloop.IOLoop.instance().start()
-
-    print "hello!"
