@@ -15,7 +15,7 @@ from modules.Location import LocationInterface
 from modules.Logging import *
 
 #define configuration options for GISMOH
-define('port', default='8800')
+define('port', default='8801')
 define('debug', default=False)
 define('db_type')
 define('db_constr')
