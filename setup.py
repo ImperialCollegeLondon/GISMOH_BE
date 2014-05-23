@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-requirements = ['tornado']
+requirements = ['tornado', 'pika']
 
 setup(
     name = 'GISMOH',

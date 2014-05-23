@@ -19,3 +19,6 @@
 *.db
 /cover
 *.conf
+*.egg-info
+.vagrant
+BEAGLE
