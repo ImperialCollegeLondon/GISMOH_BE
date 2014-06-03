@@ -1,28 +1,36 @@
-## 12/05/2014 begin modifications to backend serve
+#! /usr/bin/env python
+
+# 12/05/2014 begin modifications to backend serve
 
 import tornado.ioloop
 import tornado.web
 from tornado import gen
 from tornado.options import parse_command_line, parse_config_file, define, options
-
 import json
 from os import path
 import uuid
 import datetime
 
+
 from store.SQL import SQLiteStore, MSSQLStore
 from store import Store
-from modules.Antibiogram import Antibiogram, AntibiogramInterface
+from modules.Antibiogram import Antibiogram
 from modules.Location import LocationInterface
 from modules.Logging import *
+from modules.analysis.Base import AnalysisRequest
 
 #define configuration options for GISMOH
-define('port', default='8801')
-define('debug', default=False)
+define('port', default='3000')
+define('debug', default=True)
 define('db_type')
 define('db_constr')
 define('time_format', default='%Y-%m-%dT%H:%M:%S')
 define('profile_out', default='profile.out')
+define('rabbit_server', default='192.168.30.10')
+define('rabbit_port', default=5672)
+define('analysis_request_exchange', default='analysis')
+define('similarity_queue', default='analysis.similarity')
+define('rabbit_prefix', default='gismoh')
 
 #helper method to return a HTTP GET argument or a default value
 def get_arg_or_default(torn, argname, default):
@@ -33,7 +41,12 @@ def get_arg_or_default(torn, argname, default):
     return arg
 
 #Create and return and instance of a database connection
-def create_db_instance(db_type, con_str):
+def create_db_instance(db_type = None, con_str = None):
+    if db_type is None:
+        db_type = options.db_type
+    if con_str is None:
+        con_str = options.db_constr
+
     dbs = {
         'SQLITE' : SQLiteStore,
         'MSSQL' : MSSQLStore
@@ -128,7 +141,7 @@ class AntibiogramHandler(tornado.web.RequestHandler):
 
         _store = create_db_instance(options.db_type, options.db_constr)
         #instance of the antibiogram module
-        _abm = AntibiogramInterface(_store)
+
 
         p_list = []
         f_list= []
@@ -142,7 +155,7 @@ class AntibiogramHandler(tornado.web.RequestHandler):
             ab_list = Antibiogram.get_by(_store, 'isolate_id', isolate_id)
 
             for abx in ab_list :
-                for ab in _abm.get_nearest(abx, None, 11.5/12.0, gap_penalty = 0.25):
+                for ab in Antibiogram.get_nearest(_store, abx, None, 11.5/12.0, gap_penalty = 0.25):
                     isolate = Store.Isolate.get(_store, ab['Antibiogram'].isolate_id)
                     patient = Store.Patient.get(_store, isolate.patient_id)
 
@@ -317,6 +330,32 @@ class RiskAndPositiveHandler(tornado.web.RequestHandler):
         self.add_header('Content-type', 'application/json')
         self.finish(json.dumps([pat for pat in sorted(patients.values(), key = lambda obj : obj['patient_id']) if pat.has_key('ab') ]))
 
+class SimiliarityAnalysisDispatchHandler(tornado.web.RequestHandler):
+    @tornado.web.asynchronous
+    def get(self):
+        self.set_header("Access-Control-Allow-Origin", "http://localhost:9000")
+
+        isolate_ids = json.loads(get_arg_or_default(self, 'isolate_ids', '[]'))
+
+        analysis_request = AnalysisRequest('similarity', isolate_ids)
+
+        request_uuid = analysis_request.start_request()
+
+        self.finish(request_uuid)
+
+
+def rabbit_error(*args):
+    print '---- %s' % args
+
+def request_similarity_analysis(isolate_ids):
+    analysis_request('similarity', { 'isolate_ids' : isolate_ids })
+
+def check_for_response(type, uuid):
+    pass
+
+def wait_for_response(type, uuid, callback):
+    pass
+
 def init_app():
     parse_config_file('./GISMOH.conf')
     parse_command_line(final=True)
@@ -333,6 +372,7 @@ def init_app():
         (r'/api/locations', Locations),
         (r'/api/isolates', Isolates),
         (r'/api/risk_patients', RiskAndPositiveHandler),
+        (r'/api/similarity', SimiliarityAnalysisDispatchHandler),
         (r"/", MainHandler)
     ], **settings)
 
@@ -343,6 +383,7 @@ if __name__ == "__main__":
 
     logger = get_logger(__name__)
     add_file_handler(logger)
+    add_console_handler(logger)
 
     application.listen(options.port)
     tornado.ioloop.IOLoop.instance().start()

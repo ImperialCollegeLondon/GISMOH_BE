@@ -1,4 +1,4 @@
-from logging import getLogger, StreamHandler, Formatter, FileHandler, DEBUG
+from logging import getLogger, StreamHandler, Formatter, FileHandler, DEBUG, ERROR
 from logging.handlers import NTEventLogHandler, SysLogHandler
 
 def get_logger(component):
@@ -44,4 +44,6 @@ def add_sys_log_handler(logger):
 
     logger.addHandler(sh)
 
-
+def set_level(logger, level):
+    if level == 'error':
+        logger.setLevel(ERROR)
