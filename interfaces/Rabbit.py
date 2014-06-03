@@ -2,11 +2,7 @@ import pika
 from pika.adapters.tornado_connection import TornadoConnection
 from tornado.options import options
 
-from modules import Logging
-
 import types
-
-logger = Logging.get_logger('GISMOH.Rabbit')
 
 class Connection(object):
 	def __init__ (self, server, exchange_name, queue_name=None, routing_key=None):
@@ -18,13 +14,10 @@ class Connection(object):
 		self.is_ready = False
 		self.onReady = None
 
-		logger.info('started...')
 		self.connection = TornadoConnection(pika.ConnectionParameters(server), self.connectCallback, self.error)
 
 
 	def connectCallback(self, connection):
-		#self.ready()
-		logger.info('connected')
 		self.connection.add_on_close_callback(self.connectionClosedCallback)
 		self.connection.channel(on_open_callback=self.channelOpenCallback)
 
@@ -57,7 +50,7 @@ class Connection(object):
 		pass
 
 	def error(self, error):
-		logger.error(error)
+		pass
 
 class Consumer(Connection):
 	def __init__(self, server, exchange_name, queue_name, routing_key=None):
@@ -66,7 +59,6 @@ class Consumer(Connection):
 
 	def channelOpenCallback(self, channel):
 		self.channel = channel
-		self.channel.add_on_close_callback(self.channelClosed)
 		self.channel.queue_declare(self.queue_declared, self.queue_name)
 
 	def queue_declared(self, queue):
@@ -85,6 +77,9 @@ class Consumer(Connection):
 	def acknowledge_message(self, tag):
 		self.channel.basic_ack(tag)
 
+	def negative_acknowledge_message(self, tag):
+		self.channel.basic_nack(tag)
+
 	def addMessageHandler(self, handler):
 		self.messageHandler = handler
 
@@ -92,6 +87,10 @@ class Consumer(Connection):
 		if self.messageHandler :
 			self.messageHandler(basic_deliver.delivery_tag, properties.app_id, body)
 
+	def close(self, ioloop=True):
+		self.connection.close()
+		if ioloop:
+			self.connection.ioloop.stop()
 
 
 class Producer(Connection):

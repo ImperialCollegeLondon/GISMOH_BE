@@ -128,7 +128,7 @@ class Antibiogram(GISMOH_Object):
             res = Antibiogram.compare(ab1, ab2, mismatch_penalty, gap_penalty)
 
             if res >= cutoff:
-                results.append({ 'Antibiogram' : ab2, 'similarity' : res })
+                results.append({ 'Antibiogram' : ab2.get_dict(), 'similarity' : res })
 
         if n is not None:
             sorted_results = sorted(results, key = lambda obj : obj['similarity'], reverse = True)

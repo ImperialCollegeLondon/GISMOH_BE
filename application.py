@@ -17,7 +17,7 @@ from store import Store
 from modules.Antibiogram import Antibiogram
 from modules.Location import LocationInterface
 from modules.Logging import *
-from modules.analysis.Base import AnalysisRequest
+from modules.analysis.Base import AnalysisRequest, AnalysisNotificationReciever
 
 #define configuration options for GISMOH
 define('port', default='3000')
@@ -29,6 +29,7 @@ define('profile_out', default='profile.out')
 define('rabbit_server', default='192.168.30.10')
 define('rabbit_port', default=5672)
 define('analysis_request_exchange', default='analysis')
+define('analysis_notification_exchange', default='analysis.notifications')
 define('similarity_queue', default='analysis.similarity')
 define('rabbit_prefix', default='gismoh')
 
@@ -335,13 +336,22 @@ class SimiliarityAnalysisDispatchHandler(tornado.web.RequestHandler):
     def get(self):
         self.set_header("Access-Control-Allow-Origin", "http://localhost:9000")
 
-        isolate_ids = json.loads(get_arg_or_default(self, 'isolate_ids', '[]'))
+        isolate_ids = get_arg_or_default(self, 'isolate_id', '').split(',')
 
         analysis_request = AnalysisRequest('similarity', isolate_ids)
 
         request_uuid = analysis_request.start_request()
 
-        self.finish(request_uuid)
+        self.listener = AnalysisNotificationReciever('similarity', request_uuid, self.on_result_recieved)
+
+    def on_result_recieved(self, message_id, app_id, body):
+        self.listener.acknowledge(message_id)
+        self.write(body)
+
+        self.listener.close()
+        self.finish()
+
+
 
 
 def rabbit_error(*args):

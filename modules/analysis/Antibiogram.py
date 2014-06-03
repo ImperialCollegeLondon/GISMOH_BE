@@ -1,41 +1,78 @@
 from modules.analysis.Base import AnalysisRequestReciever, AnalysisNotification
 from modules import Logging
 from modules.Antibiogram import Antibiogram
+from modules.Location import LocationInterface
 
 from application import create_db_instance, init_app
 
 logger = Logging.get_logger('GISMOH.Antibiogram_worker')
 Logging.add_console_handler(logger)
 
+
+pika_logger = Logging.get_logger('pika.channel')
+Logging.set_level(pika_logger, 'error')
+
+pika_logger = Logging.get_logger('pika.callback')
+Logging.set_level(pika_logger, 'error')
+
+pika_logger = Logging.get_logger('pika.connection')
+Logging.set_level(pika_logger, 'error')
+
 class AntibiogramWorker(AnalysisRequestReciever):
 	def __init__(self):
-		super(AntibiogramWorker, self).__init__('similarity', self.process_request)
+		try:
+			super(AntibiogramWorker, self).__init__('similarity', self.process_request)
+		except KeyboardInterrupt:
+			self.close()
+			logger.info('Worker Stopped')
+
 
 	def process_request(self, message_id, app_id, body):
 		request = AntibiogramSimilarityRequest(body['uuid'], body['params'])
 
-		request.analyzeAll()
+		request.analyze_all_antibiograms()
+
+		if type(request.results) is dict:
+			logger.info('ack' + str(message_id))
+			self.acknowledge(message_id)
+			self.send_results(request)
+		else:
+			self.negative_acknowledge(message_id)
+			logger.info('nack' + result.isolates)
 
 	def send_results(self, request):
-		Notification = AnalysisNotification('similarity', requres.uuid, request.results).sendNotification()
+		Notification = AnalysisNotification('similarity', request.uuid, request.results).send_notification()
 
 
 class AntibiogramSimilarityRequest(object):
 	def __init__(self, uuid, request_params):
-		self.uuid = uuid,
+		self.uuid = uuid
 		self.isolates = request_params
+		self.results = {}
+		#we can submit mutliple isolate IDS so we should return the result
+		# with each collection keyed to the isolate that it was related to
 
-	def analyzeAll(self):
-		init_app();
+	def analyze_all_antibiograms(self):
+		init_app()
 		db = create_db_instance()
 
+		related_antibiograms = {}
+
 		for isolate in self.isolates:
-			logger.debug(isolate)
 
 			antibiogram = Antibiogram.find(db, isolate)
-			
+
 			if antibiogram is not None:
-				antibiograms = Antibiogram.get_nearest(db, antibiogram, 5)
+				logger.info(antibiogram)
+				nearest_antibiograms = Antibiogram.get_nearest(db, antibiogram)
+
+				self.results[isolate] = []
+
+				for near_antibiogram in nearest_antibiograms:
+					self.results[isolate].append(near_antibiogram)
+
+		return self.results
+
 
 if __name__ == '__main__':
 	AntibiogramWorker()
