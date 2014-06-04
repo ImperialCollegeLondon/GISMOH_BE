@@ -22,3 +22,5 @@
 *.egg-info
 .vagrant
 BEAGLE
+
+deploy.sh
