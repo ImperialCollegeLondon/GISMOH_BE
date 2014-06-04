@@ -71,6 +71,9 @@ class Consumer(Connection):
 		self.channel.basic_consume(self.onMessageRecieved, self.queue_name)
 		self.ready()
 
+	def delete_queue(self, callback, queue_name):
+		self.channel.queue_delete(callback, queue_name)
+
 	def listen(self):
 		self.connection.ioloop.start()
 

@@ -65,9 +65,9 @@ class AnalysisNotification(object):
 
 class AnalysisNotificationReciever(object):
 	def __init__(self, analysis_type, request_uuid, message_callback):
-		queue_name = ('%s.%s' % (request_uuid, analysis_type))
+		self.queue_name = ('%s.%s' % (request_uuid, analysis_type))
 
-		self.consumer = Consumer(options.rabbit_server, options.analysis_notification_exchange, queue_name, queue_name)
+		self.consumer = Consumer(options.rabbit_server, options.analysis_notification_exchange, self.queue_name, self.queue_name)
 		self.consumer.addMessageHandler(self.messageRecieved)
 		self.message_callback = message_callback
 
@@ -81,4 +81,7 @@ class AnalysisNotificationReciever(object):
 		self.consumer.acknowledge_message(message_id)
 
 	def close(self):
+		self.consumer.delete_queue(self.on_queue_delete_close, self.queue_name)
+
+	def on_queue_delete_close(self, unused):
 		self.consumer.close(ioloop=False)
