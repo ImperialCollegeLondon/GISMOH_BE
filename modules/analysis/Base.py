@@ -1,5 +1,5 @@
 import uuid, json
-from interfaces.Rabbit import Producer, Consumer
+from interfaces.Rabbit import Connection, Producer, Consumer
 from tornado.options import options
 from time import ctime
 
@@ -11,22 +11,22 @@ class AnalysisRequest(object):
 		self.params = { 'uuid' : self.uuid, 'params' : params }
 
 	def send_analysis_request(self):
-		self.connection.sendMessage(self.params if type(self.params) == str else json.dumps(self.params), self.finish)
+		self.producer.sendMessage(self.params if type(self.params) == str else json.dumps(self.params), self.finish)
 
 	def finish(self):
-		self.connection.close()
+		self.producer.close()
 
-	def start_request(self):
-		self.connection = Producer(options.rabbit_server, options.analysis_request_exchange, self.type, self.type)
-		self.connection.addOnReady(self.send_analysis_request)
+	def start_request(self, connection):
+		self.producer = connection.getProducer(options.analysis_request_exchange, self.type, self.type)
+		self.producer.addOnReady(self.send_analysis_request)
 		return self.uuid
 
 class AnalysisRequestReciever(object):
-	def __init__(self, analysis_type, message_callback):
-		self.consumer = Consumer(options.rabbit_server, options.analysis_request_exchange, analysis_type, analysis_type)
+	def __init__(self, connection, analysis_type, message_callback):
+
+		self.consumer = connection.getConsumer(options.analysis_request_exchange, analysis_type, analysis_type)
 		self.consumer.addMessageHandler(self.messageRecieved)
 		self.message_callback = message_callback
-		self.consumer.listen()
 
 	def messageRecieved(self, message_id, app_id, body):
 		if self.message_callback:
@@ -51,23 +51,23 @@ class AnalysisNotification(object):
 		self.analysis_type = analysis_type
 		self.result = result
 
-	def send_notification(self):
+	def send_notification(self, connection):
 		queue_name = ('%s.%s' % (self.uuid, self.analysis_type))
 
-		self.connection = Producer(options.rabbit_server, options.analysis_notification_exchange, queue_name, queue_name)
-		self.connection.addOnReady(self.ready_to_send)
+		self.sender = connection.getProducer(options.analysis_notification_exchange, queue_name, queue_name)
+		self.sender.addOnReady(self.ready_to_send)
 
 	def ready_to_send(self):
-		self.connection.sendMessage(self.result if type(self.result) == str else json.dumps(self.result), self.finish)
+		self.sender.sendMessage(self.result if type(self.result) == str else json.dumps(self.result), self.finish)
 
 	def finish(self):
-		self.connection.close()
+		self.sender.close()
 
 class AnalysisNotificationReciever(object):
-	def __init__(self, analysis_type, request_uuid, message_callback):
+	def __init__(self, connection, analysis_type, request_uuid, message_callback):
 		self.queue_name = ('%s.%s' % (request_uuid, analysis_type))
 
-		self.consumer = Consumer(options.rabbit_server, options.analysis_notification_exchange, self.queue_name, self.queue_name)
+		self.consumer = connection.getConsumer(options.analysis_notification_exchange, self.queue_name, self.queue_name)
 		self.consumer.addMessageHandler(self.messageRecieved)
 		self.message_callback = message_callback
 
@@ -84,4 +84,4 @@ class AnalysisNotificationReciever(object):
 		self.consumer.delete_queue(self.on_queue_delete_close, self.queue_name)
 
 	def on_queue_delete_close(self, unused):
-		self.consumer.close(ioloop=False)
+		self.consumer.close()

@@ -14,6 +14,9 @@ import datetime
 
 from store.SQL import SQLiteStore, MSSQLStore
 from store import Store
+
+from interfaces.Rabbit import Connection
+
 from modules.Antibiogram import Antibiogram
 from modules.Location import LocationInterface
 from modules.Logging import *
@@ -340,18 +343,19 @@ class SimiliarityAnalysisDispatchHandler(tornado.web.RequestHandler):
 
         analysis_request = AnalysisRequest('similarity', isolate_ids)
 
-        request_uuid = analysis_request.start_request()
+        request_uuid = analysis_request.start_request(connection)
 
-        self.listener = AnalysisNotificationReciever('similarity', request_uuid, self.on_result_recieved)
+        self.listener = AnalysisNotificationReciever(connection, 'similarity', request_uuid, self.on_result_recieved)
+        logger.info('listener_on ' + request_uuid)
 
     def on_result_recieved(self, message_id, app_id, body):
+        logger.info('result')
+
         self.listener.acknowledge(message_id)
         self.write(body)
 
         self.listener.close()
         self.finish()
-
-
 
 
 def rabbit_error(*args):
@@ -389,11 +393,15 @@ def init_app():
     return application
 
 if __name__ == "__main__":
+    connection = Connection(options.rabbit_server)
     application = init_app()
 
-    logger = get_logger(__name__)
+    logger = get_logger('GISMOH.webserver')
     add_file_handler(logger)
     add_console_handler(logger)
+
+    supress = get_logger('pika')
+    set_level(supress, 'error')
 
     application.listen(options.port)
     tornado.ioloop.IOLoop.instance().start()

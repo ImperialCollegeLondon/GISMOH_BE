@@ -3,25 +3,24 @@ from modules import Logging
 from modules.Antibiogram import Antibiogram
 from modules.Location import LocationInterface
 
+from interfaces.Rabbit import Connection
+
+from tornado.options import options
+
 from application import create_db_instance, init_app
 
 logger = Logging.get_logger('GISMOH.Antibiogram_worker')
 Logging.add_console_handler(logger)
 
-
-pika_logger = Logging.get_logger('pika.channel')
-Logging.set_level(pika_logger, 'error')
-
-pika_logger = Logging.get_logger('pika.callback')
-Logging.set_level(pika_logger, 'error')
-
-pika_logger = Logging.get_logger('pika.connection')
+pika_logger = Logging.get_logger('pika')
 Logging.set_level(pika_logger, 'error')
 
 class AntibiogramWorker(AnalysisRequestReciever):
-	def __init__(self):
+	def __init__(self, connection):
+		self.connection = connection
+
 		try:
-			super(AntibiogramWorker, self).__init__('similarity', self.process_request)
+			super(AntibiogramWorker, self).__init__(connection, 'similarity', self.process_request)
 		except KeyboardInterrupt:
 			self.close()
 			logger.info('Worker Stopped')
@@ -41,7 +40,7 @@ class AntibiogramWorker(AnalysisRequestReciever):
 			logger.info('nack' + result.isolates)
 
 	def send_results(self, request):
-		Notification = AnalysisNotification('similarity', request.uuid, request.results).send_notification()
+		Notification = AnalysisNotification('similarity', request.uuid, request.results).send_notification(self.connection)
 
 
 class AntibiogramSimilarityRequest(object):
@@ -74,5 +73,10 @@ class AntibiogramSimilarityRequest(object):
 		return self.results
 
 
+def connect(connection):
+	AntibiogramWorker(connection)
+
 if __name__ == '__main__':
-	AntibiogramWorker()
+	rabbit_connection = Connection(options.rabbit_server)
+	rabbit_connection.addOnReady(connect)
+	rabbit_connection.runio()
