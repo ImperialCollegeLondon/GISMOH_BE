@@ -7,7 +7,6 @@ import types
 from modules import Logging
 
 log = Logging.get_logger('Gismoh.Rabbit')
-Logging.add_console_handler(log)
 
 # 04/06/2014 - Modification of the Connection to spawn, rather than subclass Producers and consumers
 
@@ -146,7 +145,6 @@ class Consumer(Channel):
 
 class Producer(Channel):
 	def sendMessage(self, msg, callback):
-		log.info('sending message ' + msg)
 		self.channel.basic_publish(exchange=self.exchange_name, routing_key=self.routing_key, body=msg)
 		#callback()
 

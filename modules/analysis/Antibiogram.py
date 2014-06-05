@@ -3,6 +3,8 @@ from modules import Logging
 from modules.Antibiogram import Antibiogram
 from modules.Location import LocationInterface
 
+from store.Store import Patient, Isolate
+
 from interfaces.Rabbit import Connection
 
 from tornado.options import options
@@ -32,7 +34,6 @@ class AntibiogramWorker(AnalysisRequestReciever):
 		request.analyze_all_antibiograms()
 
 		if type(request.results) is dict:
-			logger.info('ack' + str(message_id))
 			self.acknowledge(message_id)
 			self.send_results(request)
 		else:
@@ -48,29 +49,61 @@ class AntibiogramSimilarityRequest(object):
 		self.uuid = uuid
 		self.isolates = request_params
 		self.results = {}
+		self.patient_ids = []
+		init_app()
+
+		self.db = create_db_instance()
 		#we can submit mutliple isolate IDS so we should return the result
 		# with each collection keyed to the isolate that it was related to
 
 	def analyze_all_antibiograms(self):
-		init_app()
-		db = create_db_instance()
 
 		related_antibiograms = {}
 
 		for isolate in self.isolates:
+			self.patient_ids = []
 
-			antibiogram = Antibiogram.find(db, isolate)
+			antibiogram = Antibiogram.find(self.db, isolate)
 
 			if antibiogram is not None:
-				logger.info(antibiogram)
-				nearest_antibiograms = Antibiogram.get_nearest(db, antibiogram)
+				nearest_antibiograms = Antibiogram.get_nearest(self.db, antibiogram)
 
 				self.results[isolate] = []
 
 				for near_antibiogram in nearest_antibiograms:
 					self.results[isolate].append(near_antibiogram)
+					if self.patient_ids.count(near_antibiogram['patient']) == 0:
+						self.patient_ids.append(near_antibiogram['patient'])
+				# Do location overlap analysis
+				self.look_for_overlaps()
 
 		return self.results
+
+	def look_for_overlaps(self):
+		for isolate_number in self.results:
+			patient_id = Isolate.get(self.db, isolate_number).patient_id
+			for antibiogram in self.results[isolate_number]:
+				antibiogram['location_overlaps'] = 0
+
+				if patient_id is not None:
+					location_interface = LocationInterface(self.db)
+					location_overlaps = location_interface.get_overlaps_with_patient(Patient.get(self.db, patient_id))
+
+					for overlap_key in location_overlaps:
+						overlapping_location = location_overlaps[overlap_key]
+						logger.info(overlapping_location)
+						continue
+
+						if self.patient_ids.count(overlapping_location.patient_id):
+							for antibiogram in self.results[isolate_number]:
+								if antibiogram['patient'] == overlapping_location.patient_id:
+									antibiogram['location_overlaps'] += 1
+				else:
+					logger.error ('no patient ' + str(patient_id))
+
+
+
+
 
 
 def connect(connection):

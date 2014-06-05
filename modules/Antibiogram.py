@@ -1,6 +1,6 @@
 ##Takes Result objects with Antibiograms and compares them
 ##
-from store.Store import GISMOH_Object
+from store.Store import GISMOH_Object, Isolate
 
 class Antibiogram(GISMOH_Object):
     instance_id = None
@@ -128,7 +128,9 @@ class Antibiogram(GISMOH_Object):
             res = Antibiogram.compare(ab1, ab2, mismatch_penalty, gap_penalty)
 
             if res >= cutoff:
-                results.append({ 'Antibiogram' : ab2.get_dict(), 'similarity' : res })
+                isolate = Isolate.get(db, ab2.isolate_id)
+
+                results.append({ 'Antibiogram' : ab2.get_dict(), 'similarity' : res, 'patient' :  isolate.patient_id})
 
         if n is not None:
             sorted_results = sorted(results, key = lambda obj : obj['similarity'], reverse = True)
