@@ -30,8 +30,8 @@ class Connection(object):
 		if self.onReady is not None:
 			self.onReady(self)
 
-	def getConsumer(self, exchange_name, queue_name=None, routing_key=None):
-		return Consumer(self.connection, exchange_name, queue_name, routing_key)
+	def getConsumer(self, exchange_name, queue_name=None, routing_key=None, auto_delete=False):
+		return Consumer(self.connection, exchange_name, queue_name, routing_key, auto_delete)
 
 	def getProducer(self, exchange_name, queue_name=None, routing_key=None):
 		return Producer(self.connection, exchange_name, queue_name, routing_key)
@@ -63,7 +63,7 @@ class Connection(object):
 
 
 class Channel(object):
-	def __init__(self, connection, exchange_name, queue_name=None, routing_key=None):
+	def __init__(self, connection, exchange_name, queue_name=None, routing_key=None, auto_delete=False):
 		self.is_ready = False
 		self.onReady = None
 
@@ -102,10 +102,11 @@ class Channel(object):
 		pass
 
 class Consumer(Channel):
-	def __init__(self, connection, exchange_name, queue_name, routing_key=None):
+	def __init__(self, connection, exchange_name, queue_name, routing_key=None, auto_delete=False):
 		log.info('create consumer')
 		super(Consumer, self).__init__(connection, exchange_name, queue_name, routing_key)
 		self.messageHandler = None
+		self.auto_delete = auto_delete
 
 	def openChannel(self, connection):
 		log.info('open channel')
@@ -114,7 +115,8 @@ class Consumer(Channel):
 	def channelOpenCallback(self, channel):
 		log.info('channel open')
 		self.channel = channel
-		self.channel.queue_declare(self.queue_declared, self.queue_name)
+		log.info('Auto delete = %s', self.auto_delete)
+		self.channel.queue_declare(self.queue_declared, self.queue_name, auto_delete = self.auto_delete)
 
 	def queue_declared(self, queue):
 		if self.routing_key is not None:

@@ -31,6 +31,8 @@ class AntibiogramWorker(AnalysisRequestReciever):
 	def process_request(self, message_id, app_id, body):
 		request = AntibiogramSimilarityRequest(body['uuid'], body['params'])
 
+		logger.info('%s - recieved' % (body['uuid']))
+
 		request.analyze_all_antibiograms()
 
 		if type(request.results) is dict:
@@ -38,7 +40,6 @@ class AntibiogramWorker(AnalysisRequestReciever):
 			self.send_results(request)
 		else:
 			self.negative_acknowledge(message_id)
-			logger.info('nack' + result.isolates)
 
 	def send_results(self, request):
 		Notification = AnalysisNotification('similarity', request.uuid, request.results).send_notification(self.connection)
@@ -91,7 +92,6 @@ class AntibiogramSimilarityRequest(object):
 
 					for overlap_key in location_overlaps:
 						overlapping_location = location_overlaps[overlap_key]
-						logger.info(overlapping_location)
 						continue
 
 						if self.patient_ids.count(overlapping_location.patient_id):
@@ -100,11 +100,6 @@ class AntibiogramSimilarityRequest(object):
 									antibiogram['location_overlaps'] += 1
 				else:
 					logger.error ('no patient ' + str(patient_id))
-
-
-
-
-
 
 def connect(connection):
 	AntibiogramWorker(connection)

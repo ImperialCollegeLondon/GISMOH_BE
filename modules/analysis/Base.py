@@ -67,7 +67,7 @@ class AnalysisNotificationReciever(object):
 	def __init__(self, connection, analysis_type, request_uuid, message_callback):
 		self.queue_name = ('%s.%s' % (request_uuid, analysis_type))
 
-		self.consumer = connection.getConsumer(options.analysis_notification_exchange, self.queue_name, self.queue_name)
+		self.consumer = connection.getConsumer(options.analysis_notification_exchange, self.queue_name, self.queue_name, True)
 		self.consumer.addMessageHandler(self.messageRecieved)
 		self.message_callback = message_callback
 
