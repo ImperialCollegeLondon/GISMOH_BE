@@ -5,7 +5,7 @@ from json import dumps, loads
 class ObjectSender(object):
 	def __init__ (self, connection, object_type):
 		queue_name = 'gismoh.objects.%s' % (object_type)
-		self.connection = Producer(connection, 'gismoh.objects', queue_name, queue_name)
+		self.connection = connection.getProducer('gismoh.objects', queue_name, queue_name)
 
 	def send(self, obj):
 		self.message = obj.get_dict()
@@ -17,18 +17,20 @@ class ObjectSender(object):
 
 class ObjectReciever(object):
 	def __init__(self):
-		def __init__ (self, connection, object_type=None):
+		def __init__ (self, connection, object_type=None, message_callback):
 			if type is None:
 				queue_name = 'gismoh.objects.all'
 				routing_key = 'gismoh.objects.#'
 			else:
 				queue_name = 'gismoh.objects.%s' % (object_type)
 				routing_key = queue_name
-			self.connection = Producer(connection, 'gismoh.objects', queue_name, routing_key)
+			self.connection = connection.getConsumer('gismoh.objects', queue_name, routing_key, True)
 
-		def send(self, obj):
-			self.message = obj.get_dict()
-			self.connection.onReady(self.send_message_when_ready)
+			self.consumer.addMessageHandler(self.messageRecieved)
+			self.message_callback = message_callback
 
-		def send_message_when_ready(self):
-			self.connection.send(json.dumps(self.message))
+		def messageRecieved(self, message_id, app_id, body):
+			if self.message_callback:
+				data = json.loads(body)
+
+				self.message_callback(message_id, app_id, data)

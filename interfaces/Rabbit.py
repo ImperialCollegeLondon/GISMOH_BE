@@ -7,6 +7,7 @@ import types
 from modules import Logging
 
 log = Logging.get_logger('Gismoh.Rabbit')
+Logging.add_console_handler(log)
 
 # 04/06/2014 - Modification of the Connection to spawn, rather than subclass Producers and consumers
 
@@ -83,6 +84,7 @@ class Channel(object):
 
 	def channelOpenCallback(self, channel):
 		self.channel = channel
+		self.channel.add_on_close_callback(self.channelClosed)
 		self.ready()
 
 	def addOnReady(self, callback):
@@ -93,13 +95,14 @@ class Channel(object):
 		self.onReady = callback
 
 	def close(self):
-		self.channel.close()
+		self.channel.close(0, 'closing normally')
+		log.info('channel closing...')
 
-	def channelClosed(self, one, two, three):
-		pass
+	def channelClosed(self, channel, reply_code, reply_text):
+		log.info('channel closed ' + reply_text)
 
 	def error(self, error):
-		pass
+		log.error(error)
 
 class Consumer(Channel):
 	def __init__(self, connection, exchange_name, queue_name, routing_key=None, auto_delete=False):
@@ -115,6 +118,7 @@ class Consumer(Channel):
 	def channelOpenCallback(self, channel):
 		log.info('channel open')
 		self.channel = channel
+		self.channel.add_on_close_callback(self.channelClosed)
 		log.info('Auto delete = %s', self.auto_delete)
 		self.channel.queue_declare(self.queue_declared, self.queue_name, auto_delete = self.auto_delete)
 
@@ -148,7 +152,7 @@ class Consumer(Channel):
 class Producer(Channel):
 	def sendMessage(self, msg, callback):
 		self.channel.basic_publish(exchange=self.exchange_name, routing_key=self.routing_key, body=msg)
-		#callback()
+		callback()
 
 	def channelOpenCallback(self, channel):
 		self.channel = channel

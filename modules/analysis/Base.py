@@ -84,4 +84,5 @@ class AnalysisNotificationReciever(object):
 		self.consumer.delete_queue(self.on_queue_delete_close, self.queue_name)
 
 	def on_queue_delete_close(self, unused):
+		print 'xxx closing xxx'
 		self.consumer.close()
