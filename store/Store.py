@@ -43,6 +43,24 @@ class Mapping:
 
         self._mapper[_class] = _map
 
+class GISMOH_encoder(json.JSONEncoder):
+    def default(self, o):
+        if isinstance(o, GISMOH_Object):
+            return { "gismoh_type" : type(o).__name__, "object": o.get_dict(True) }
+        else:
+            super(GISMOH_encode, self).default(self, o)
+
+def GISMOH_object_hook(json_object):
+    if 'gismoh_type' in json_object:
+        from sys import modules
+        gismoh_class= getattr(modules[__name__], json_object['gismoh_type'])
+        obj = gismoh_class()
+        if json_object['object'] is not None:
+            obj.from_dict(json_object['object'])
+        return obj
+    else:
+        return json_object
+
 ## Base class describing functions shared by GISMOH objects
 class GISMOH_Object(object):
 
@@ -61,7 +79,6 @@ class GISMOH_Object(object):
         int_dict = self.__dict__
 
         for prop in int_dict:
-
             if dt_strings :
                 if type(int_dict[prop]) == datetime.date:
                     obj_dict[prop] = int_dict[prop].strftime('%Y-%m-%d')
@@ -108,6 +125,12 @@ class GISMOH_Object(object):
     def get(cls, store, key):
 
          return store.get(cls, key)
+
+    def __str__(self):
+        return str(self.__dict__)
+
+    def __cmp__(self, other):
+        return self.__dict__ == other.__dict__
 
 class Admission(GISMOH_Object):
     uniq_id = None
@@ -289,7 +312,7 @@ class Patient(GISMOH_Object):
     def get_dict(self, date_strings=False, obj_strings = False):
         pre_dict = super(Patient, self).get_dict(date_strings, obj_strings)
 
-        pre_dict.pop('hospital_numbers')
+        #pre_dict.pop('hospital_numbers')
 
         return pre_dict
 
@@ -297,7 +320,7 @@ class Patient(GISMOH_Object):
         super(Patient, self).from_dict(_dict, _map)
 
         if type(self.date_of_birth) == unicode or type(self.date_of_birth) == str:
-            self.date_of_birth = datetime.datetime.strptime(self.date_of_birth, '%Y-%m-%d %H:%M:%S')
+            self.date_of_birth = datetime.datetime.strptime(self.date_of_birth, '%Y-%m-%d').date()
 
     ## Get NHS Number in a the format 000-000-0000
     @staticmethod
