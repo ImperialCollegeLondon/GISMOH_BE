@@ -148,11 +148,12 @@ class Consumer(Channel):
 		if self.messageHandler :
 			self.messageHandler(basic_deliver.delivery_tag, properties.app_id, body)
 
-
+#
 class Producer(Channel):
-	def sendMessage(self, msg, callback):
-		self.channel.basic_publish(exchange=self.exchange_name, routing_key=self.routing_key, body=msg)
-		callback()
+	def sendMessage(self, msg, callback = None, routing_key = None):
+		self.channel.basic_publish(exchange=self.exchange_name, routing_key=(routing_key if routing_key is not None else self.routing_key), body=msg)
+		if callback is not None:
+			callback()
 
 	def channelOpenCallback(self, channel):
 		self.channel = channel

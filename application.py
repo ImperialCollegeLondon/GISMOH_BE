@@ -35,6 +35,7 @@ define('analysis_request_exchange', default='analysis')
 define('analysis_notification_exchange', default='analysis.notifications')
 define('similarity_queue', default='analysis.similarity')
 define('rabbit_prefix', default='gismoh')
+define('file')
 
 #helper method to return a HTTP GET argument or a default value
 def get_arg_or_default(torn, argname, default):
@@ -72,6 +73,13 @@ def create_db_instance(db_type = None, con_str = None):
         'patient_id': 'patient_id',
         'hospital' : 'hospital_id',
         'hospital_number' : 'hospitalNumber'
+    })
+
+    _map.add_object('Admission', 'Admission',{
+        'uniq_id' : 'admission_id',
+        'start_date' : 'admissionDate',
+        'end_date': 'dischargeDate',
+        'patient_id' : 'patient_id'
     })
 
     _map.add_object('Location', 'PatientLocation',{
@@ -288,14 +296,14 @@ class RiskAndPositiveHandler(tornado.web.RequestHandler):
         self.set_header("Access-Control-Allow-Origin", "http://localhost:9000")
         _store = create_db_instance(options.db_type, options.db_constr)
 
-        interval = get_arg_or_default(self, 'days' , 1)
+        interval = int(get_arg_or_default(self, 'days' , 1))
 
         at_date = datetime.datetime.strptime(get_arg_or_default(self,'at_date', datetime.datetime.now().strftime(options.time_format)), options.time_format)
         cutoff_date = at_date - datetime.timedelta(days = interval)
 
         patients = {}
 
-        for loc in Store.Location.get_locations_between(_store, at_date, at_date - datetime.timedelta(days=1)):
+        for loc in Store.Location.get_locations_between(_store, at_date, cutoff_date):
             patient = Store.Patient.get(_store, loc.patient_id)
 
             if patient.nhs_number is None or patient.nhs_number == '':

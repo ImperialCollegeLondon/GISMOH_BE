@@ -5,14 +5,29 @@ from time import mktime
 from re import match
 import uuid
 
+from interfaces.Rabbit import Connection
+from modules.ObjectMessaging import ObjectSender
+from modules.Antibiogram import Antibiogram
+
+from tornado.options import options
+from application import init_app
+
+from modules import Logging
+
+logger = Logging.get_logger('SCBU Importer')
+Logging.add_console_handler(logger)
+
+rabbit_logging = Logging.get_logger('pika')
+Logging.set_level(rabbit_logging, 'error')
+
 ##Import data from the SCBU dataset
 class SCBU_Importer(object):
     reader = None
     sender = None
 
-    def __init__(self, filename, store):
+    def __init__(self, filename, connection):
         self.reader = xlrd.open_workbook(filename)
-        self.sender = ObjectSender()
+        self.sender = ObjectSender(connection)
 
     def read_admissions(self):
         _rr = self.row_reader('Admissions')
@@ -23,7 +38,7 @@ class SCBU_Importer(object):
         curlocs = []
 
         for row in _rr:
-            #print row
+            logger.info(row)
             patient = self.read_patient(row, headers)
             location = self.read_location(row, headers)
 
@@ -31,10 +46,10 @@ class SCBU_Importer(object):
 
                 for l in curlocs:
                     l.admission_id = self.adm.get_key()
-                    self.store.save(l)
+                    #self.sender.send(l)
                 curlocs = []
 
-                self.store.save(self.adm)
+                #self.sender.send(self.adm)
 
                 self.adm = Store.Admission()
 
@@ -81,9 +96,9 @@ class SCBU_Importer(object):
 
         _pat = Store.Patient()
         _pat.from_dict(_dict, {
-            'Patient_Number' : 'uniq_id'
+            'Patient_Number' : 'nhs_number'
         })
-        self.store.save(_pat)
+        self.sender.send(_pat)
         return _pat
 
     def read_location(self, row, headers):
@@ -92,7 +107,7 @@ class SCBU_Importer(object):
         _location = Store.Location()
 
         _location.from_dict(_dict,{
-            'Patient_Number' : 'patient_id',
+            'Patient_Number' : 'nhs_number',
             'EpisodeAdmissionDate' : 'arrived',
             'EpisodeDischargeDate' : 'left',
             'Ward' : 'ward'
@@ -107,7 +122,7 @@ class SCBU_Importer(object):
 
         _iso = Store.Isolate()
         _iso.from_dict(_dict, {
-            'Patient_Number': 'patient_id',
+            'Patient_Number': 'nhs_number',
             'Isolate_Number': 'lab_number',
             'DateSent' : 'date_taken'
         })
@@ -118,29 +133,44 @@ class SCBU_Importer(object):
             'accession_number' : _dict['Accession_Number']
         }
 
-        _result = Store.Result()
-        _result.test_type = 'Disc Diffusion'
-        _result.result_type = 'Antibiogram'
+        _result = Antibiogram()
         _result.isolate_id = _dict['Isolate_Number']
-        _result.test_date = _iso.date_taken
-        _result.result = []
-        _result.patient_id = _dict['Patient_Number']
+        _result.date_tested = _iso.date_taken
+        _result.organism = 'Staphylcoccus aureus'
 
-        str_ab = ''
+
+        ab_dict = {}
 
         for h in headers:
             if h.startswith('SR') and _dict[h] != '':
                 abname = h.replace('SR', '')
+                ab_dict[abname] = _dict[h]
 
-                ab_dict = {
-                    'Antibiotic' : abname,
-                    'SIR' : _dict[h]
-                }
+        _result.sir_result = ab_dict
+        _result.sir_results_identifier = _result.get_result_identifier()
 
-                str_ab += _dict[h]
+        print _iso
+        self.sender.send(_iso)
+        self.sender.send(_result)
 
-                _result.result.append(ab_dict)
+def start(connection):
+    global importer
+    logger.info('start...')
+    importer = SCBU_Importer(options.file, connection)
+    importer.sender.onReady = run
 
+def run():
+    global importer
+    logger.info('run..')
+    importer.read_admissions()
+    importer.read_isolates()
 
-        self.store.save(_iso)
-        self.store.save(_result)
+def end():
+    connection.close()
+
+if __name__ == '__main__':
+    init_app()
+    rabbit_connection = Connection(options.rabbit_server)
+    rabbit_connection.addOnReady(start)
+    logger.info('running io...')
+    rabbit_connection.runio()
